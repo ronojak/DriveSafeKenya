@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DriveSafe Kenya</string>
+    <string name="app_tagline">Speed awareness for safer roads</string>
+    <string name="camera_zones_loaded">Camera Zones Loaded: %1$d</string>
+    <string name="start_driving">Start Driving Mode</string>
+    <string name="stop_driving">Stop Driving Mode</string>
+    <string name="current_speed_label">Current Speed</string>
+    <string name="speed_value">%1$d km/h</string>
+    <string name="speed_unavailable">-- km/h</string>
+    <string name="permission_denied_message">Location permission is needed to display your speed and detect nearby camera zones. Please enable it in Settings.</string>
+    <string name="camera_zone_nearby">Camera Zone Nearby</string>
+    <string name="nearest_camera_zone">Nearest Camera Zone</string>
+    <string name="no_camera_zone">No Camera Zone Available</string>
+    <string name="speed_limit_label">Limit: %1$s</string>
+    <string name="variable_limit_label">Variable limit: %1$s</string>
+    <string name="distance_label">Distance: %1$s m</string>
+    <string name="overspeed_warning">Above speed limit. Slow down.</string>
+    <string name="overspeed_detail">Limit: %1$d km/h · Tolerance: +%2$d km/h</string>
+    <string name="disclaimer">Speed limits and camera alerts are provided for driver awareness only. Always obey posted road signs and official traffic laws. Camera locations and speed limits may change.</string>
+    <string name="settings">Settings</string>
+    <string name="settings_alerts">Alerts</string>
+    <string name="settings_voice_alerts">Voice Alerts</string>
+    <string name="settings_vibration_alerts">Vibration Alerts</string>
+    <string name="settings_detection">Detection</string>
+    <string name="settings_warning_distance">Warning Distance</string>
+    <string name="settings_speed_tolerance">Speed Tolerance</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_keep_screen_on">Keep Screen On</string>
+    <string name="settings_keep_screen_on_desc">Prevents screen from turning off while driving</string>
+    <string name="settings_data_updates">Data Updates</string>
+    <string name="settings_data_version">Version: %1$s</string>
+    <string name="settings_zone_count">Camera Zones: %1$d</string>
+    <string name="settings_data_source">Source: %1$s</string>
+    <string name="settings_check_updates">Check for Updates</string>
+    <string name="sync_checking">Checking…</string>
+    <string name="sync_up_to_date">Up to date</string>
+    <string name="sync_updated">Updated to v%1$s (%2$d zones)</string>
+    <string name="sync_failed">Update failed. Using offline data.</string>
+</resources>

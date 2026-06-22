@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="safe_green">#FF2E7D32</color>
+    <color name="warning_amber">#FFF9A825</color>
+    <color name="danger_red">#FFC62828</color>
+</resources>

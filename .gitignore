@@ -1,0 +1,45 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin
+kotlin-js-store/
+.kotlin/
+
+# Compiled output
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+generated/
+out/
+
+# macOS
+.DS_Store
+
+# Signing
+*.jks
+*.keystore
+
+# Log files
+*.log
+
+# Django backend
+backend/venv/
+backend/db.sqlite3
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
