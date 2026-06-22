@@ -3,8 +3,8 @@
     "id": "thika_safari_park_001",
     "roadName": "Thika Superhighway",
     "locationName": "Safari Park",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2193,
+    "longitude": 36.8592,
     "speedLimitKmh": 110,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 110,
@@ -14,14 +14,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "thika_jomoko_001",
     "roadName": "Thika Superhighway",
     "locationName": "Jomoko / Thika Turnoff",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.0396,
+    "longitude": 37.0753,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -31,14 +31,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "thika_allsops_001",
     "roadName": "Thika Superhighway",
     "locationName": "Allsops / GSU HQ",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2437,
+    "longitude": 36.8476,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -48,14 +48,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "thika_pangani_001",
     "roadName": "Thika Superhighway",
     "locationName": "Pangani / Muthaiga Interchange",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2620,
+    "longitude": 36.8360,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -65,14 +65,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "thika_roysambu_001",
     "roadName": "Thika Superhighway",
     "locationName": "Roysambu / TRM",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2186,
+    "longitude": 36.8873,
     "speedLimitKmh": 100,
     "minSpeedLimitKmh": 80,
     "maxSpeedLimitKmh": 100,
@@ -82,14 +82,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "expressway_museum_hill_001",
     "roadName": "Nairobi Expressway",
     "locationName": "Museum Hill to Westlands",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2714,
+    "longitude": 36.8118,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -99,14 +99,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "expressway_nyayo_001",
     "roadName": "Nairobi Expressway",
     "locationName": "After Nyayo Stadium",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.3048,
+    "longitude": 36.8222,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -116,14 +116,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "mombasa_nyayo_sameer_001",
     "roadName": "Mombasa Road",
     "locationName": "Nyayo Stadium to Sameer / GM Area",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.3120,
+    "longitude": 36.8340,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -133,14 +133,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "mombasa_cabanas_jkia_001",
     "roadName": "Mombasa Road",
     "locationName": "Cabanas to JKIA Stretch",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.3390,
+    "longitude": 36.8620,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -150,14 +150,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "southern_bypass_weighbridge_001",
     "roadName": "Southern Bypass",
     "locationName": "Near Virtual Weighbridge, Ngong Road Side",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.3350,
+    "longitude": 36.7580,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -167,14 +167,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "northern_bypass_gitaru_001",
     "roadName": "Northern Bypass",
     "locationName": "Gitaru / Wangige",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2100,
+    "longitude": 36.7300,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -184,14 +184,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "northern_bypass_ruaka_001",
     "roadName": "Northern Bypass",
     "locationName": "Ruaka / Wangige",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2070,
+    "longitude": 36.7640,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 80,
@@ -201,14 +201,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "waiyaki_kangemi_001",
     "roadName": "Waiyaki Way",
     "locationName": "Kangemi to Uthiru",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2590,
+    "longitude": 36.7440,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": 60,
     "maxSpeedLimitKmh": 80,
@@ -218,14 +218,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "kiambu_road_001",
     "roadName": "Kiambu Road",
     "locationName": "Kiambu Road Corridor",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2350,
+    "longitude": 36.8350,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": 50,
     "maxSpeedLimitKmh": 80,
@@ -235,14 +235,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "limuru_road_001",
     "roadName": "Limuru Road",
     "locationName": "Limuru Road Corridor",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2370,
+    "longitude": 36.7860,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": 50,
     "maxSpeedLimitKmh": 80,
@@ -252,14 +252,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "likoni_road_001",
     "roadName": "Likoni Road",
     "locationName": "Likoni Road / Industrial Area",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.3050,
+    "longitude": 36.8480,
     "speedLimitKmh": 80,
     "minSpeedLimitKmh": 50,
     "maxSpeedLimitKmh": 80,
@@ -269,14 +269,14 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   },
   {
     "id": "urban_junctions_001",
     "roadName": "Urban Roads",
     "locationName": "Urban Roads / Junctions",
-    "latitude": 0.0,
-    "longitude": 0.0,
+    "latitude": -1.2864,
+    "longitude": 36.8172,
     "speedLimitKmh": 50,
     "minSpeedLimitKmh": null,
     "maxSpeedLimitKmh": 50,
@@ -286,6 +286,6 @@
     "status": "active",
     "verified": false,
     "source": "initial_image_dataset",
-    "lastUpdated": "2026-06-22"
+    "lastUpdated": "2026-06-23"
   }
 ]
