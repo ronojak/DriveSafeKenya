@@ -40,6 +40,8 @@ fun SettingsScreen(
     onOverspeedToleranceChanged: (Int) -> Unit,
     onKeepScreenOnChanged: (Boolean) -> Unit,
     onCheckForUpdates: () -> Unit,
+    onUpgrade: () -> Unit,
+    onLogout: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -162,6 +164,30 @@ fun SettingsScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(24.dp))
+        SectionHeader(stringResource(R.string.settings_premium))
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(
+            onClick = onUpgrade,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = stringResource(R.string.settings_upgrade))
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(24.dp))
+        SectionHeader(stringResource(R.string.auth_login_title))
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = stringResource(R.string.auth_logout))
         }
 
         Spacer(modifier = Modifier.height(32.dp))

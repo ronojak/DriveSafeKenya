@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,7 +26,7 @@ SECRET_KEY = 'django-insecure-=f(0h+@i*7t9r1711t^p%7p5iog+(u)egc_d#lz3f*fk%tflkc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -38,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'accounts',
+    'payments',
     'zones',
 ]
 
@@ -123,3 +126,33 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = 'accounts.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+import os
+
+BASE_URL_PUBLIC = os.getenv('BASE_URL_PUBLIC', 'http://localhost:8111')
+DARAJA_ENV = os.getenv('DARAJA_ENV', 'sandbox')
+DARAJA_CONSUMER_KEY = os.getenv('DARAJA_CONSUMER_KEY', '')
+DARAJA_CONSUMER_SECRET = os.getenv('DARAJA_CONSUMER_SECRET', '')
+DARAJA_SHORTCODE = os.getenv('DARAJA_SHORTCODE', '')
+DARAJA_PASSKEY = os.getenv('DARAJA_PASSKEY', '')
+DARAJA_TRANSACTION_TYPE = os.getenv('DARAJA_TRANSACTION_TYPE', 'CustomerPayBillOnline')
+MPESA_ACCOUNT_REFERENCE = os.getenv('MPESA_ACCOUNT_REFERENCE', 'DriveSafe')
+MPESA_TRANSACTION_DESC = os.getenv('MPESA_TRANSACTION_DESC', 'DriveSafe Kenya payment')
+MPESA_CALLBACK_SECRET = os.getenv('MPESA_CALLBACK_SECRET', '')

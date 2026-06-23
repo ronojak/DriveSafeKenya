@@ -27,13 +27,24 @@ import com.drivesafe.kenya.data.CameraZoneRepository
 import com.drivesafe.kenya.data.DriveSafeDatabase
 import com.drivesafe.kenya.data.LocalJsonDataSource
 import com.drivesafe.kenya.data.SettingsRepository
-import com.drivesafe.kenya.data.SyncMetadata
 import com.drivesafe.kenya.data.SyncResult
 import com.drivesafe.kenya.data.UserSettings
 import com.drivesafe.kenya.data.api.DriveSafeApiService
+import com.drivesafe.kenya.data.auth.AuthApi
+import com.drivesafe.kenya.data.auth.AuthRepository
+import com.drivesafe.kenya.data.auth.AuthResult
+import com.drivesafe.kenya.data.auth.SessionManager
+import com.drivesafe.kenya.data.payment.PaymentApi
+import com.drivesafe.kenya.data.payment.PaymentRepository
+import com.drivesafe.kenya.data.payment.PaymentResult
 import com.drivesafe.kenya.location.LocationService
 import com.drivesafe.kenya.ui.DrivingScreen
 import com.drivesafe.kenya.ui.HomeScreen
+import com.drivesafe.kenya.ui.LoginScreen
+import com.drivesafe.kenya.ui.PaymentPhase
+import com.drivesafe.kenya.ui.PaymentScreen
+import com.drivesafe.kenya.ui.PaymentUiState
+import com.drivesafe.kenya.ui.RegisterScreen
 import com.drivesafe.kenya.ui.SettingsScreen
 import com.drivesafe.kenya.ui.theme.DriveSafeKenyaTheme
 import kotlinx.coroutines.launch
@@ -59,9 +70,16 @@ class MainActivity : ComponentActivity() {
         alertManager = AlertManager(applicationContext)
         settingsRepo = SettingsRepository(applicationContext)
 
+        val sessionManager = SessionManager(applicationContext)
+        val authApi = AuthApi.create()
+        val authRepository = AuthRepository(authApi, sessionManager)
+        val paymentApi = PaymentApi.create()
+        val paymentRepository = PaymentRepository(paymentApi, sessionManager)
+
         enableEdgeToEdge()
         setContent {
             DriveSafeKenyaTheme {
+                val isLoggedIn by sessionManager.isLoggedIn.collectAsState(initial = false)
                 val isDriving by locationService.isActive.collectAsState()
                 val speedKmh by locationService.speedKmh.collectAsState()
                 val userLocation by locationService.userLocation.collectAsState()
@@ -74,6 +92,11 @@ class MainActivity : ComponentActivity() {
                 var isSyncing by remember { mutableStateOf(false) }
                 var permissionDenied by remember { mutableStateOf(false) }
                 var showSettings by remember { mutableStateOf(false) }
+                var showPayment by remember { mutableStateOf(false) }
+                var showRegister by remember { mutableStateOf(false) }
+                var authLoading by remember { mutableStateOf(false) }
+                var authError by remember { mutableStateOf<String?>(null) }
+                var paymentState by remember { mutableStateOf(PaymentUiState()) }
                 val scope = rememberCoroutineScope()
 
                 LaunchedEffect(Unit) {
@@ -116,6 +139,53 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     when {
+                        !isLoggedIn && showRegister -> {
+                            RegisterScreen(
+                                isLoading = authLoading,
+                                error = authError,
+                                onRegister = { email, password, name ->
+                                    scope.launch {
+                                        authLoading = true
+                                        authError = null
+                                        when (val res = authRepository.register(email, password, name)) {
+                                            is AuthResult.Success -> {
+                                                authError = null
+                                                showRegister = false
+                                            }
+                                            is AuthResult.Error -> authError = res.message
+                                        }
+                                        authLoading = false
+                                    }
+                                },
+                                onNavigateToLogin = {
+                                    authError = null
+                                    showRegister = false
+                                },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
+                        !isLoggedIn -> {
+                            LoginScreen(
+                                isLoading = authLoading,
+                                error = authError,
+                                onLogin = { email, password ->
+                                    scope.launch {
+                                        authLoading = true
+                                        authError = null
+                                        when (val res = authRepository.login(email, password)) {
+                                            is AuthResult.Success -> authError = null
+                                            is AuthResult.Error -> authError = res.message
+                                        }
+                                        authLoading = false
+                                    }
+                                },
+                                onNavigateToRegister = {
+                                    authError = null
+                                    showRegister = true
+                                },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
                         isDriving -> {
                             DrivingScreen(
                                 speedKmh = speedKmh,
@@ -126,6 +196,73 @@ class MainActivity : ComponentActivity() {
                                 onStopDriving = {
                                     locationService.stopUpdates()
                                     alertManager.reset()
+                                },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
+                        showPayment -> {
+                            PaymentScreen(
+                                state = paymentState,
+                                onPhoneChanged = { paymentState = paymentState.copy(phoneNumber = it) },
+                                onPlanSelected = { paymentState = paymentState.copy(selectedPlanCode = it) },
+                                onPay = {
+                                    scope.launch {
+                                        paymentState = paymentState.copy(isLoading = true, error = null)
+                                        val result = paymentRepository.initiateStkPush(
+                                            paymentState.phoneNumber, paymentState.selectedPlanCode
+                                        )
+                                        when (result) {
+                                            is PaymentResult.StkPushSent -> {
+                                                paymentState = paymentState.copy(
+                                                    isLoading = false,
+                                                    phase = PaymentPhase.WAITING_FOR_PIN,
+                                                    message = result.message
+                                                )
+                                                paymentState = paymentState.copy(phase = PaymentPhase.POLLING)
+                                                val pollResult = paymentRepository.pollPaymentStatus(result.paymentId)
+                                                paymentState = when (pollResult) {
+                                                    is PaymentResult.Paid -> paymentState.copy(
+                                                        phase = PaymentPhase.SUCCESS,
+                                                        receiptNumber = pollResult.receiptNumber,
+                                                        expiryDate = pollResult.expiryDate
+                                                    )
+                                                    is PaymentResult.Failed -> paymentState.copy(
+                                                        phase = PaymentPhase.FAILED,
+                                                        error = pollResult.message
+                                                    )
+                                                    is PaymentResult.Cancelled -> paymentState.copy(
+                                                        phase = PaymentPhase.FAILED,
+                                                        error = "Payment cancelled"
+                                                    )
+                                                    is PaymentResult.Timeout -> paymentState.copy(
+                                                        phase = PaymentPhase.FAILED,
+                                                        error = "Payment timed out. Check M-PESA messages."
+                                                    )
+                                                    else -> paymentState
+                                                }
+                                            }
+                                            is PaymentResult.Failed -> {
+                                                paymentState = paymentState.copy(
+                                                    isLoading = false,
+                                                    error = result.message
+                                                )
+                                            }
+                                            else -> {
+                                                paymentState = paymentState.copy(isLoading = false)
+                                            }
+                                        }
+                                    }
+                                },
+                                onRetry = {
+                                    paymentState = paymentState.copy(
+                                        phase = PaymentPhase.SELECT_PLAN,
+                                        error = null,
+                                        message = null
+                                    )
+                                },
+                                onBack = {
+                                    showPayment = false
+                                    paymentState = PaymentUiState(plans = paymentState.plans)
                                 },
                                 modifier = Modifier.padding(innerPadding)
                             )
@@ -152,6 +289,20 @@ class MainActivity : ComponentActivity() {
                                             is SyncResult.Failed -> getString(R.string.sync_failed)
                                         }
                                         isSyncing = false
+                                    }
+                                },
+                                onUpgrade = {
+                                    showSettings = false
+                                    showPayment = true
+                                    scope.launch {
+                                        val plans = paymentRepository.getPlans()
+                                        paymentState = paymentState.copy(plans = plans)
+                                    }
+                                },
+                                onLogout = {
+                                    scope.launch {
+                                        authRepository.logout()
+                                        showSettings = false
                                     }
                                 },
                                 onBack = { showSettings = false },
