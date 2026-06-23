@@ -156,3 +156,6 @@ DARAJA_TRANSACTION_TYPE = os.getenv('DARAJA_TRANSACTION_TYPE', 'CustomerPayBillO
 MPESA_ACCOUNT_REFERENCE = os.getenv('MPESA_ACCOUNT_REFERENCE', 'DriveSafe')
 MPESA_TRANSACTION_DESC = os.getenv('MPESA_TRANSACTION_DESC', 'DriveSafe Kenya payment')
 MPESA_CALLBACK_SECRET = os.getenv('MPESA_CALLBACK_SECRET', '')
+
+_trusted_proxies_raw = os.getenv('TRUSTED_PROXY_IPS', '')
+TRUSTED_PROXY_IPS = set(ip.strip() for ip in _trusted_proxies_raw.split(',') if ip.strip())
