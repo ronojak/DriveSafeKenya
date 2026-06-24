@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import Payment, PaymentPlan, Subscription, PaymentAuditLog
-from .daraja import stk_push, normalize_phone
+from .daraja import stk_push, stk_query, normalize_phone
 
 SAFARICOM_IP_RANGES = [
     ipaddress.ip_network("196.201.214.0/24"),
@@ -31,13 +31,20 @@ def _get_client_ip(request):
 
 
 def _is_safaricom_ip(request):
-    if getattr(settings, "DARAJA_ENV", "sandbox") == "sandbox":
-        return True
     try:
         client_ip = ipaddress.ip_address(_get_client_ip(request))
         return any(client_ip in net for net in SAFARICOM_IP_RANGES)
     except ValueError:
         return False
+
+
+def _verify_callback_secret(request):
+    secret = getattr(settings, "MPESA_CALLBACK_SECRET", "")
+    if not secret:
+        return True
+    import hmac
+    header_val = request.headers.get("X-Mpesa-Callback-Secret", "")
+    return hmac.compare_digest(secret, header_val)
 
 
 def _grant_subscription(user, plan, payment):
@@ -117,9 +124,7 @@ def mpesa_stk_push_view(request):
         phone_number=phone,
     )
 
-    callback_secret = getattr(settings, "MPESA_CALLBACK_SECRET", "")
-    callback_suffix = f"/api/payments/mpesa/callback/{callback_secret}" if callback_secret else "/api/payments/mpesa/callback"
-    callback_url = settings.BASE_URL_PUBLIC.rstrip("/") + callback_suffix
+    callback_url = settings.BASE_URL_PUBLIC.rstrip("/") + "/api/payments/mpesa/callback"
 
     try:
         daraja_resp = stk_push(
@@ -163,9 +168,14 @@ def mpesa_stk_push_view(request):
 
 @api_view(["POST"])
 def mpesa_callback_view(request):
-    if not _is_safaricom_ip(request):
-        logger.warning("Callback from non-Safaricom IP: %s", _get_client_ip(request))
+    if not _verify_callback_secret(request):
+        logger.warning("Callback with invalid secret from: %s", _get_client_ip(request))
         return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if getattr(settings, "DARAJA_ENV", "sandbox") != "sandbox":
+        if not _is_safaricom_ip(request):
+            logger.warning("Callback from non-Safaricom IP: %s", _get_client_ip(request))
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
     body = request.data or {}
     callback = (body.get("Body") or {}).get("stkCallback") or {}
@@ -252,6 +262,37 @@ def payment_status_view(request):
         return Response(
             {"error": "Payment not found"}, status=status.HTTP_404_NOT_FOUND
         )
+
+    if payment.status == "PENDING" and payment.checkout_request_id:
+        try:
+            q = stk_query(payment.checkout_request_id)
+            result_code = q.get("ResultCode")
+            if result_code is not None:
+                result_code = int(result_code)
+            result_desc = q.get("ResultDesc", "")
+
+            if result_code == 0:
+                payment.status = "PAID"
+                payment.result_code = result_code
+                payment.paid_at = timezone.now()
+                payment.save(update_fields=["status", "result_code", "paid_at"])
+                _log_audit(payment, "query_success", "PENDING", "PAID", payload=q)
+                if payment.plan:
+                    _grant_subscription(payment.user, payment.plan, payment)
+            elif result_code in (1032, 1037):
+                payment.status = "CANCELLED"
+                payment.result_code = result_code
+                payment.failure_reason = result_desc
+                payment.save(update_fields=["status", "result_code", "failure_reason"])
+                _log_audit(payment, "query_cancelled", "PENDING", "CANCELLED", result_desc, q)
+            elif result_code in (1, 2001, 1019, 1001):
+                payment.status = "FAILED"
+                payment.result_code = result_code
+                payment.failure_reason = result_desc
+                payment.save(update_fields=["status", "result_code", "failure_reason"])
+                _log_audit(payment, "query_failed", "PENDING", "FAILED", result_desc, q)
+        except Exception as e:
+            logger.debug("STK query for payment %s: %s", payment_id, e)
 
     sub = Subscription.objects.filter(user=request.user).first()
 

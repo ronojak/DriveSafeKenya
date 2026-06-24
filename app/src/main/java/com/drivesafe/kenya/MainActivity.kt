@@ -327,6 +327,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onSettings = { showSettings = true },
+                                onUpgrade = {
+                                    showPayment = true
+                                    scope.launch {
+                                        val plans = paymentRepository.getPlans()
+                                        paymentState = paymentState.copy(plans = plans)
+                                    }
+                                },
                                 modifier = Modifier.padding(innerPadding)
                             )
                         }

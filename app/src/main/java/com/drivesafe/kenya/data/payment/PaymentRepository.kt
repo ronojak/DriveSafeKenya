@@ -49,7 +49,7 @@ class PaymentRepository(
     suspend fun pollPaymentStatus(paymentId: String): PaymentResult {
         val b = bearer() ?: return PaymentResult.Failed("Not logged in")
         val startTime = System.currentTimeMillis()
-        val timeoutMs = 90_000L
+        val timeoutMs = 45_000L
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             try {

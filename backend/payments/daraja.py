@@ -59,6 +59,27 @@ def stk_push(
     return r.json()
 
 
+def stk_query(checkout_request_id: str) -> dict:
+    token = _token()
+    ts = dt.datetime.now().strftime("%Y%m%d%H%M%S")
+    password = base64.b64encode(
+        f"{settings.DARAJA_SHORTCODE}{settings.DARAJA_PASSKEY}{ts}".encode()
+    ).decode()
+
+    url = f"{_get_base_url()}/mpesa/stkpushquery/v1/query"
+    payload = {
+        "BusinessShortCode": settings.DARAJA_SHORTCODE,
+        "Password": password,
+        "Timestamp": ts,
+        "CheckoutRequestID": checkout_request_id,
+    }
+    r = requests.post(
+        url, json=payload, headers={"Authorization": f"Bearer {token}"}, timeout=15
+    )
+    r.raise_for_status()
+    return r.json()
+
+
 def normalize_phone(raw: str) -> str | None:
     s = "".join(c for c in raw if c.isdigit())
     if s.startswith("2547") and len(s) == 12:

@@ -25,6 +25,7 @@ fun HomeScreen(
     permissionDenied: Boolean,
     onStartDriving: () -> Unit,
     onSettings: () -> Unit,
+    onUpgrade: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -64,6 +65,13 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(0.7f)
         ) {
             Text(text = stringResource(R.string.settings))
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onUpgrade,
+            modifier = Modifier.fillMaxWidth(0.7f)
+        ) {
+            Text(text = stringResource(R.string.settings_upgrade))
         }
         if (permissionDenied) {
             Spacer(modifier = Modifier.height(16.dp))
