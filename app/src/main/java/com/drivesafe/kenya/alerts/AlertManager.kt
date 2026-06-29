@@ -26,6 +26,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val lastAlertTimes = mutableMapOf<AlertType, Long>()
     private var lastZoneId: String? = null
+    private val warningStateTracker = CameraWarningStateTracker()
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -47,32 +48,54 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         if (speedKmh == null) return
 
         val currentZoneId = nearbyCamera?.zone?.id
+        val isNearby = nearbyCamera?.isInWarningRadius == true
+        val isOverspeed = overspeedResult?.status == OverspeedStatus.OVERSPEED
+
+        // Update which zones the driver is currently inside (resets count on exit)
+        val nearbyIds = if (isNearby && currentZoneId != null) setOf(currentZoneId) else emptySet()
+        warningStateTracker.updateNearbyZones(nearbyIds)
+
+        // Reset time-based cooldowns when the nearest zone changes
         if (currentZoneId != lastZoneId) {
             lastAlertTimes.clear()
             lastZoneId = currentZoneId
         }
 
-        val isNearby = nearbyCamera?.isInWarningRadius == true
-        val isOverspeed = overspeedResult?.status == OverspeedStatus.OVERSPEED
-
-        val alertType = when {
-            isNearby && isOverspeed -> AlertType.STRONG_WARNING
-            isOverspeed -> AlertType.OVERSPEED
-            isNearby -> AlertType.NEARBY_CAMERA
-            else -> return
+        when {
+            isNearby && isOverspeed -> {
+                if (isCooldownExpired(AlertType.STRONG_WARNING)) {
+                    val msg = buildOverspeedMessage(nearbyCamera!!, overspeedResult!!)
+                    if (voiceEnabled) speak(msg)
+                    if (vibrationEnabled) vibrate(AlertType.STRONG_WARNING)
+                    lastAlertTimes[AlertType.STRONG_WARNING] = SystemClock.elapsedRealtime()
+                }
+            }
+            isOverspeed -> {
+                if (isCooldownExpired(AlertType.OVERSPEED)) {
+                    if (voiceEnabled) speak(buildMessage(AlertType.OVERSPEED, overspeedResult))
+                    if (vibrationEnabled) vibrate(AlertType.OVERSPEED)
+                    lastAlertTimes[AlertType.OVERSPEED] = SystemClock.elapsedRealtime()
+                }
+            }
+            isNearby -> {
+                // Proximity-only warning: max 2 per zone entry, spaced by COOLDOWN_NEARBY_MS
+                if (isCooldownExpired(AlertType.NEARBY_CAMERA) &&
+                    warningStateTracker.shouldWarnProximity(currentZoneId!!)
+                ) {
+                    val msg = buildProximityMessage(nearbyCamera!!)
+                    if (voiceEnabled) speak(msg)
+                    if (vibrationEnabled) vibrate(AlertType.NEARBY_CAMERA)
+                    lastAlertTimes[AlertType.NEARBY_CAMERA] = SystemClock.elapsedRealtime()
+                }
+            }
         }
-
-        if (!isCooldownExpired(alertType)) return
-
-        if (voiceEnabled) speak(buildMessage(alertType, overspeedResult))
-        if (vibrationEnabled) vibrate(alertType)
-        lastAlertTimes[alertType] = SystemClock.elapsedRealtime()
     }
 
     fun reset() {
         tts?.stop()
         lastAlertTimes.clear()
         lastZoneId = null
+        warningStateTracker.reset()
     }
 
     fun shutdown() {
@@ -82,6 +105,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         ttsReady = false
         lastAlertTimes.clear()
         lastZoneId = null
+        warningStateTracker.reset()
     }
 
     private fun isCooldownExpired(type: AlertType): Boolean {
@@ -94,25 +118,35 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         return SystemClock.elapsedRealtime() - lastTime >= cooldownMs
     }
 
+    private fun buildProximityMessage(camera: NearbyCameraResult): String {
+        val distanceKm = camera.distanceMeters / 1000f
+        val limit = camera.zone.speedLimitKmh
+        return if (limit != null) {
+            "Camera zone ahead in ${"%.1f".format(distanceKm)} kilometres. Speed limit is $limit kilometres per hour."
+        } else {
+            "Camera zone ahead in ${"%.1f".format(distanceKm)} kilometres. Please obey the speed limit."
+        }
+    }
+
+    private fun buildOverspeedMessage(camera: NearbyCameraResult, overspeed: OverspeedResult): String {
+        val limit = overspeed.applicableLimitKmh
+        return if (limit != null) {
+            "You are above the speed limit. Speed limit is $limit kilometres per hour. Slow down. Camera zone ahead."
+        } else {
+            "You are above the speed limit. Slow down. Camera zone ahead."
+        }
+    }
+
     private fun buildMessage(type: AlertType, overspeedResult: OverspeedResult?): String {
         return when (type) {
-            AlertType.NEARBY_CAMERA -> {
-                val limit = overspeedResult?.applicableLimitKmh
-                if (limit != null) {
-                    "Speed camera ahead. Limit is $limit kilometres per hour."
-                } else {
-                    "Speed camera ahead."
-                }
-            }
             AlertType.OVERSPEED ->
                 "You are above the speed limit. Please slow down."
-            AlertType.STRONG_WARNING ->
-                "Warning. Speed camera ahead and you are above the speed limit. Reduce speed now."
+            else -> ""
         }
     }
 
     private fun speak(message: String) {
-        if (!ttsReady) return
+        if (!ttsReady || message.isEmpty()) return
         tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
     }
 
@@ -127,9 +161,10 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
     companion object {
         private const val TAG = "AlertManager"
         private const val UTTERANCE_ID = "drivesafe_alert"
-        private const val COOLDOWN_NEARBY_MS = 120_000L
-        private const val COOLDOWN_OVERSPEED_MS = 30_000L
-        private const val COOLDOWN_STRONG_MS = 30_000L
+        // Two proximity warnings per zone entry, spaced 60 s apart
+        private const val COOLDOWN_NEARBY_MS = 60_000L
+        private const val COOLDOWN_OVERSPEED_MS = 15_000L
+        private const val COOLDOWN_STRONG_MS = 15_000L
         private val VIBRATE_NEARBY = longArrayOf(0, 200)
         private val VIBRATE_OVERSPEED = longArrayOf(0, 300, 100, 300)
     }

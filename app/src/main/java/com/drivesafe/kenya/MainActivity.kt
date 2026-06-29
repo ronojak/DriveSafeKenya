@@ -104,9 +104,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val nearbyCamera = userLocation?.let { (lat, lng) ->
-                    CameraProximityDetector.findNearest(
-                        lat, lng, cameraZones, settings.warningDistanceMeters
-                    )
+                    CameraProximityDetector.findNearest(lat, lng, cameraZones)
                 }
 
                 val overspeedResult = if (speedKmh != null && nearbyCamera != null) {

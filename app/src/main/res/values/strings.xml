@@ -14,7 +14,9 @@
     <string name="no_camera_zone">No Camera Zone Available</string>
     <string name="speed_limit_label">Limit: %1$s</string>
     <string name="variable_limit_label">Variable limit: %1$s</string>
-    <string name="distance_label">Distance: %1$s m</string>
+    <string name="distance_label">Distance: %1$s</string>
+    <string name="camera_zone_ahead">Camera Zone Ahead</string>
+    <string name="camera_zone_overspeed">Camera Zone Ahead — Slow Down!</string>
     <string name="overspeed_warning">Above speed limit. Slow down.</string>
     <string name="overspeed_detail">Limit: %1$d km/h · Tolerance: +%2$d km/h</string>
     <string name="disclaimer">Speed limits and camera alerts are provided for driver awareness only. Always obey posted road signs and official traffic laws. Camera locations and speed limits may change.</string>

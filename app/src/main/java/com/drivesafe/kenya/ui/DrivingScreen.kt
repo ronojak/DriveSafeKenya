@@ -27,8 +27,6 @@ import com.drivesafe.kenya.R
 import com.drivesafe.kenya.alerts.NearbyCameraResult
 import com.drivesafe.kenya.alerts.OverspeedResult
 import com.drivesafe.kenya.alerts.OverspeedStatus
-import java.text.NumberFormat
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -79,7 +77,7 @@ fun DrivingScreen(
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
-        NearbyZoneSection(nearbyCamera)
+        NearbyZoneSection(nearbyCamera, isOverspeed)
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.camera_zones_loaded, cameraZoneCount),
@@ -127,7 +125,7 @@ private fun OverspeedBanner(result: OverspeedResult) {
 }
 
 @Composable
-private fun NearbyZoneSection(nearbyCamera: NearbyCameraResult?) {
+private fun NearbyZoneSection(nearbyCamera: NearbyCameraResult?, isOverspeeding: Boolean) {
     if (nearbyCamera == null) {
         Text(
             text = stringResource(R.string.no_camera_zone),
@@ -137,19 +135,23 @@ private fun NearbyZoneSection(nearbyCamera: NearbyCameraResult?) {
         return
     }
 
-    val statusColor = if (nearbyCamera.isInWarningRadius) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+    val inRange = nearbyCamera.isInWarningRadius
+    val statusColor = when {
+        inRange && isOverspeeding -> MaterialTheme.colorScheme.error
+        inRange -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val statusText = when {
+        inRange && isOverspeeding -> stringResource(R.string.camera_zone_overspeed)
+        inRange -> stringResource(R.string.camera_zone_ahead)
+        else -> stringResource(R.string.nearest_camera_zone)
     }
 
     Text(
-        text = if (nearbyCamera.isInWarningRadius) {
-            stringResource(R.string.camera_zone_nearby)
-        } else {
-            stringResource(R.string.nearest_camera_zone)
-        },
+        text = statusText,
         style = MaterialTheme.typography.titleMedium,
+        fontWeight = if (inRange) FontWeight.Bold else FontWeight.Normal,
         color = statusColor
     )
     Spacer(modifier = Modifier.height(4.dp))
@@ -174,10 +176,9 @@ private fun NearbyZoneSection(nearbyCamera: NearbyCameraResult?) {
     )
     Spacer(modifier = Modifier.height(4.dp))
 
-    val distanceFormatted = NumberFormat.getIntegerInstance(Locale.getDefault())
-        .format(nearbyCamera.distanceMeters.roundToInt())
+    val distanceText = formatDistance(nearbyCamera.distanceMeters)
     Text(
-        text = stringResource(R.string.distance_label, distanceFormatted),
+        text = stringResource(R.string.distance_label, distanceText),
         style = MaterialTheme.typography.bodyMedium,
         color = statusColor
     )
@@ -197,6 +198,14 @@ private fun buildSpeedLimitText(result: NearbyCameraResult): String {
         "$min–$max km/h"
     } else {
         "${zone.speedLimitKmh ?: "—"} km/h"
+    }
+}
+
+private fun formatDistance(meters: Float): String {
+    return if (meters >= 1000f) {
+        "${"%.1f".format(meters / 1000f)} km"
+    } else {
+        "${meters.roundToInt()} m"
     }
 }
 
