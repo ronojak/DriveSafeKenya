@@ -3,6 +3,7 @@ package com.drivesafe.kenya
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -14,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,6 +25,8 @@ import androidx.core.content.ContextCompat
 import com.drivesafe.kenya.alerts.AlertManager
 import com.drivesafe.kenya.alerts.CameraProximityDetector
 import com.drivesafe.kenya.alerts.OverspeedDetector
+import com.drivesafe.kenya.alerts.PolicePresenceProximityDetector
+import com.drivesafe.kenya.data.AppThemeMode
 import com.drivesafe.kenya.data.CameraZoneRepository
 import com.drivesafe.kenya.data.DriveSafeDatabase
 import com.drivesafe.kenya.data.LocalJsonDataSource
@@ -37,6 +41,9 @@ import com.drivesafe.kenya.data.auth.SessionManager
 import com.drivesafe.kenya.data.payment.PaymentApi
 import com.drivesafe.kenya.data.payment.PaymentRepository
 import com.drivesafe.kenya.data.payment.PaymentResult
+import com.drivesafe.kenya.data.police.PolicePresenceApi
+import com.drivesafe.kenya.data.police.PolicePresenceRepository
+import com.drivesafe.kenya.data.police.PolicePresenceRepository.ReportResult
 import com.drivesafe.kenya.location.LocationService
 import com.drivesafe.kenya.ui.DrivingScreen
 import com.drivesafe.kenya.ui.HomeScreen
@@ -48,12 +55,15 @@ import com.drivesafe.kenya.ui.RegisterScreen
 import com.drivesafe.kenya.ui.SettingsScreen
 import com.drivesafe.kenya.ui.theme.DriveSafeKenyaTheme
 import kotlinx.coroutines.launch
+import java.security.MessageDigest
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var locationService: LocationService
     private lateinit var alertManager: AlertManager
     private lateinit var settingsRepo: SettingsRepository
+    private lateinit var policePresenceRepository: PolicePresenceRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,18 +86,25 @@ class MainActivity : ComponentActivity() {
         val paymentApi = PaymentApi.create()
         val paymentRepository = PaymentRepository(paymentApi, sessionManager)
 
+        policePresenceRepository = PolicePresenceRepository(
+            api = PolicePresenceApi.create(),
+            deviceHash = computeDeviceHash()
+        )
+
         enableEdgeToEdge()
         setContent {
-            DriveSafeKenyaTheme {
+            val themeMode by settingsRepo.themeMode.collectAsState(initial = AppThemeMode.LIGHT)
+
+            DriveSafeKenyaTheme(darkTheme = themeMode == AppThemeMode.DARK) {
                 val isLoggedIn by sessionManager.isLoggedIn.collectAsState(initial = false)
                 val isDriving by locationService.isActive.collectAsState()
                 val speedKmh by locationService.speedKmh.collectAsState()
                 val userLocation by locationService.userLocation.collectAsState()
                 val settings by settingsRepo.settings.collectAsState(initial = UserSettings())
-                val cameraZones by repository.activeZones
-                    .collectAsState(initial = emptyList())
-                val currentSyncMetadata by repository.syncMetadata
-                    .collectAsState(initial = null)
+                val cameraZones by repository.activeZones.collectAsState(initial = emptyList())
+                val currentSyncMetadata by repository.syncMetadata.collectAsState(initial = null)
+                val policeAlerts by policePresenceRepository.alerts.collectAsState()
+
                 var syncStatus by remember { mutableStateOf("") }
                 var isSyncing by remember { mutableStateOf(false) }
                 var permissionDenied by remember { mutableStateOf(false) }
@@ -97,6 +114,10 @@ class MainActivity : ComponentActivity() {
                 var authLoading by remember { mutableStateOf(false) }
                 var authError by remember { mutableStateOf<String?>(null) }
                 var paymentState by remember { mutableStateOf(PaymentUiState()) }
+                var policeReportMessage by remember { mutableStateOf<String?>(null) }
+                var lastPoliceFetchTime by remember { mutableLongStateOf(0L) }
+                var lastPoliceFetchLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
                 val scope = rememberCoroutineScope()
 
                 LaunchedEffect(Unit) {
@@ -111,14 +132,37 @@ class MainActivity : ComponentActivity() {
                     OverspeedDetector.check(
                         speedKmh!!, nearbyCamera.zone, settings.overspeedToleranceKmh
                     )
-                } else {
-                    null
+                } else null
+
+                val nearbyPoliceAlert = userLocation?.let { (lat, lng) ->
+                    PolicePresenceProximityDetector.findNearest(lat, lng, policeAlerts)
+                }
+
+                // Periodically fetch police alerts while driving: every 2 min or every 1 km
+                LaunchedEffect(userLocation, isDriving) {
+                    if (!isDriving || userLocation == null) return@LaunchedEffect
+                    val (lat, lng) = userLocation!!
+                    val now = System.currentTimeMillis()
+                    val elapsedMs = now - lastPoliceFetchTime
+                    val distanceMoved = lastPoliceFetchLocation?.let { (pLat, pLng) ->
+                        sqrt((lat - pLat) * (lat - pLat) + (lng - pLng) * (lng - pLng)) * 111_000.0
+                    } ?: Double.MAX_VALUE
+
+                    if (elapsedMs >= 120_000L || distanceMoved >= 1_000.0) {
+                        policePresenceRepository.fetchActiveAlerts(lat, lng)
+                        lastPoliceFetchLocation = Pair(lat, lng)
+                        lastPoliceFetchTime = now
+                    }
                 }
 
                 LaunchedEffect(userLocation) {
                     if (isDriving && userLocation != null) {
                         alertManager.evaluate(
                             nearbyCamera, overspeedResult, speedKmh,
+                            settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
+                        )
+                        alertManager.evaluatePolicePresence(
+                            nearbyPoliceAlert,
                             settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
                         )
                     }
@@ -187,13 +231,48 @@ class MainActivity : ComponentActivity() {
                         isDriving -> {
                             DrivingScreen(
                                 speedKmh = speedKmh,
+                                isLocationAvailable = userLocation != null,
                                 nearbyCamera = nearbyCamera,
                                 overspeedResult = overspeedResult,
                                 cameraZoneCount = cameraZones.size,
                                 keepScreenOn = settings.keepScreenOn,
+                                themeMode = themeMode,
+                                onToggleTheme = {
+                                    scope.launch {
+                                        settingsRepo.setThemeMode(
+                                            if (themeMode == AppThemeMode.LIGHT) {
+                                                AppThemeMode.DARK
+                                            } else {
+                                                AppThemeMode.LIGHT
+                                            }
+                                        )
+                                    }
+                                },
                                 onStopDriving = {
                                     locationService.stopUpdates()
                                     alertManager.reset()
+                                    policeReportMessage = null
+                                },
+                                nearbyPoliceAlert = nearbyPoliceAlert,
+                                onReportPolicePresence = {
+                                    val loc = userLocation
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                        return@DrivingScreen
+                                    }
+                                    scope.launch {
+                                        policeReportMessage = when (val r = policePresenceRepository.report(loc.first, loc.second)) {
+                                            is ReportResult.Success -> getString(R.string.police_reported_thanks)
+                                            is ReportResult.Failure -> r.reason
+                                        }
+                                    }
+                                },
+                                policeReportMessage = policeReportMessage,
+                                onConfirmPolicePresent = { alertId ->
+                                    scope.launch { policePresenceRepository.confirmPresent(alertId) }
+                                },
+                                onConfirmPoliceNotPresent = { alertId ->
+                                    scope.launch { policePresenceRepository.confirmNotPresent(alertId) }
                                 },
                                 modifier = Modifier.padding(innerPadding)
                             )
@@ -319,9 +398,7 @@ class MainActivity : ComponentActivity() {
                                     if (hasPermission) {
                                         locationService.startUpdates()
                                     } else {
-                                        permissionLauncher.launch(
-                                            Manifest.permission.ACCESS_FINE_LOCATION
-                                        )
+                                        permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                                     }
                                 },
                                 onSettings = { showSettings = true },
@@ -343,13 +420,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (locationService.isActive.value) {
-            locationService.stopUpdates()
-        }
+        if (locationService.isActive.value) locationService.stopUpdates()
     }
 
     override fun onDestroy() {
         alertManager.shutdown()
         super.onDestroy()
+    }
+
+    private fun computeDeviceHash(): String {
+        val androidId = AndroidSettings.Secure.getString(
+            applicationContext.contentResolver,
+            AndroidSettings.Secure.ANDROID_ID
+        ) ?: "unknown"
+        val bytes = MessageDigest.getInstance("SHA-256").digest(androidId.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 }

@@ -27,6 +27,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
     private val lastAlertTimes = mutableMapOf<AlertType, Long>()
     private var lastZoneId: String? = null
     private val warningStateTracker = CameraWarningStateTracker()
+    private val policeWarningStateTracker = PolicePresenceWarningStateTracker()
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -91,11 +92,33 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
+    fun evaluatePolicePresence(
+        nearbyPolice: NearbyPolicePresenceResult?,
+        voiceEnabled: Boolean = true,
+        vibrationEnabled: Boolean = true
+    ) {
+        val nearbyIds = if (nearbyPolice?.isWithinWarningRadius == true) {
+            setOf(nearbyPolice.alert.id)
+        } else emptySet()
+        policeWarningStateTracker.updateNearbyAlerts(nearbyIds)
+
+        if (nearbyPolice == null || !nearbyPolice.isWithinWarningRadius) return
+
+        if (isCooldownExpired(AlertType.POLICE_PRESENCE) &&
+            policeWarningStateTracker.shouldWarn(nearbyPolice.alert.id)
+        ) {
+            if (voiceEnabled) speak(POLICE_VOICE_MESSAGE)
+            if (vibrationEnabled) vibrate(AlertType.NEARBY_CAMERA)
+            lastAlertTimes[AlertType.POLICE_PRESENCE] = SystemClock.elapsedRealtime()
+        }
+    }
+
     fun reset() {
         tts?.stop()
         lastAlertTimes.clear()
         lastZoneId = null
         warningStateTracker.reset()
+        policeWarningStateTracker.reset()
     }
 
     fun shutdown() {
@@ -106,6 +129,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         lastAlertTimes.clear()
         lastZoneId = null
         warningStateTracker.reset()
+        policeWarningStateTracker.reset()
     }
 
     private fun isCooldownExpired(type: AlertType): Boolean {
@@ -114,6 +138,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
             AlertType.NEARBY_CAMERA -> COOLDOWN_NEARBY_MS
             AlertType.OVERSPEED -> COOLDOWN_OVERSPEED_MS
             AlertType.STRONG_WARNING -> COOLDOWN_STRONG_MS
+            AlertType.POLICE_PRESENCE -> COOLDOWN_POLICE_MS
         }
         return SystemClock.elapsedRealtime() - lastTime >= cooldownMs
     }
@@ -152,7 +177,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
 
     private fun vibrate(type: AlertType) {
         val pattern = when (type) {
-            AlertType.NEARBY_CAMERA -> VIBRATE_NEARBY
+            AlertType.NEARBY_CAMERA, AlertType.POLICE_PRESENCE -> VIBRATE_NEARBY
             AlertType.OVERSPEED, AlertType.STRONG_WARNING -> VIBRATE_OVERSPEED
         }
         vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
@@ -165,6 +190,8 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         private const val COOLDOWN_NEARBY_MS = 60_000L
         private const val COOLDOWN_OVERSPEED_MS = 15_000L
         private const val COOLDOWN_STRONG_MS = 15_000L
+        private const val COOLDOWN_POLICE_MS = 15_000L
+        const val POLICE_VOICE_MESSAGE = "Police checkpoint reported ahead. Drive carefully."
         private val VIBRATE_NEARBY = longArrayOf(0, 200)
         private val VIBRATE_OVERSPEED = longArrayOf(0, 300, 100, 300)
     }

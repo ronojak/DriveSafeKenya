@@ -68,4 +68,12 @@
     <string name="settings_premium">Premium</string>
     <string name="settings_upgrade">Upgrade to Premium</string>
     <string name="settings_premium_active">Premium Active</string>
+    <string name="report_police_presence">Report Police Presence</string>
+    <string name="police_reported_thanks">Police presence reported. Thank you for helping other drivers stay aware.</string>
+    <string name="police_location_unavailable">Location not available yet. Please try again in a few seconds.</string>
+    <string name="police_checkpoint_ahead">Police checkpoint reported ahead. Drive carefully.</string>
+    <string name="police_confirm_question">Is police presence still there?</string>
+    <string name="police_confirm_present">Police Present</string>
+    <string name="police_confirm_not_present">Not Present</string>
+    <string name="police_report_failed">Could not submit report. Please try again.</string>
 </resources>

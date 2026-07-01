@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -22,6 +23,10 @@ class SettingsRepository(private val context: Context) {
             overspeedToleranceKmh = prefs[KEY_TOLERANCE] ?: 5,
             keepScreenOn = prefs[KEY_KEEP_SCREEN_ON] ?: false
         )
+    }
+
+    val themeMode: Flow<AppThemeMode> = context.dataStore.data.map { prefs ->
+        AppThemeMode.fromStoredValue(prefs[KEY_THEME_MODE])
     }
 
     suspend fun setVoiceAlertsEnabled(enabled: Boolean) {
@@ -44,11 +49,16 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[KEY_KEEP_SCREEN_ON] = enabled }
     }
 
+    suspend fun setThemeMode(themeMode: AppThemeMode) {
+        context.dataStore.edit { it[KEY_THEME_MODE] = themeMode.name }
+    }
+
     companion object {
         private val KEY_VOICE = booleanPreferencesKey("voice_alerts_enabled")
         private val KEY_VIBRATION = booleanPreferencesKey("vibration_alerts_enabled")
         private val KEY_WARNING_DISTANCE = intPreferencesKey("warning_distance_meters")
         private val KEY_TOLERANCE = intPreferencesKey("overspeed_tolerance_kmh")
         private val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     }
 }

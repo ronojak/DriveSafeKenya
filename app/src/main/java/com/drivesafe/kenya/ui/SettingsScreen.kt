@@ -82,19 +82,6 @@ fun SettingsScreen(
         SectionHeader(stringResource(R.string.settings_detection))
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = stringResource(R.string.settings_warning_distance),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        RadioGroup(
-            options = listOf(300 to "300 m", 500 to "500 m", 700 to "700 m", 1000 to "1000 m"),
-            selected = settings.warningDistanceMeters,
-            onSelected = onWarningDistanceChanged
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
             text = stringResource(R.string.settings_speed_tolerance),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface
