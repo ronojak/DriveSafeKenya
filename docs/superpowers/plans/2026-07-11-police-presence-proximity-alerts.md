@@ -681,17 +681,14 @@ Update `reset()` and `shutdown()` — replace `policeWarningStateTracker.reset()
 
 Leave `isCooldownExpired`, `COOLDOWN_POLICE_MS`, and the `vibrate()` function's `AlertType.POLICE_PRESENCE -> VIBRATE_NEARBY` branch untouched — `COOLDOWN_POLICE_MS`/`isCooldownExpired(AlertType.POLICE_PRESENCE)` is simply no longer called (the new engine's own alerted/escalated sets replace that cooldown), but leaving the `when` branch in place avoids having to add an `else` for Kotlin's exhaustiveness check elsewhere. `POLICE_VOICE_MESSAGE` companion constant is now unused — remove it.
 
-- [ ] **Step 3: Compile check**
+- [ ] **Step 3: Compile check — expect exactly one known failure**
 
-Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin -q`
-Expected: no output, exit code 0. (This will currently fail because `MainActivity.kt` still calls the old `evaluatePolicePresence(nearbyPoliceAlert, ...)` signature — that call site is fixed in Task 11. It's acceptable for this task's compile check to fail on that one known call site; confirm the *only* error is in `MainActivity.kt` referencing `evaluatePolicePresence`, not anything inside `AlertManager.kt` itself.)
+Gradle's Kotlin compilation is whole-module: because `MainActivity.kt` still calls the old `evaluatePolicePresence(nearbyPoliceAlert, ...)` signature (fixed in Task 11), `:app:compileDebugKotlin` — and therefore `:app:testDebugUnitTest`, which depends on it — **will fail to build at all** after this task, not just report a clean pass. That is expected. Do not attempt to run `testDebugUnitTest` at this point (Task 2/3's engine/tracker tests already cover this task's actual logic in isolation, and the full suite is re-verified in Task 11 Step 7 once the module compiles again).
 
-- [ ] **Step 4: Re-run the engine/tracker unit tests to confirm nothing else broke**
+Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin 2>&1 | grep -E "error:|e: "`
+Expected: every reported error is in `MainActivity.kt` and references `evaluatePolicePresence` (unresolved reference or argument-type mismatch against the new signature). If any error appears in `AlertManager.kt`, `ProximityAlertEngine.kt`, or `DriveThroughTracker.kt`, that is a real defect in this task — fix it before continuing.
 
-Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:testDebugUnitTest --tests "com.drivesafe.kenya.alerts.*"`
-Expected: PASS for all remaining alert tests (`ProximityAlertEngineTest`, `DriveThroughTrackerTest`, `CameraProximityDetectorTest`, `CameraWarningStateTrackerTest`, `OverspeedDetectorTest`, `PolicePresenceProximityDetectorTest`); `PolicePresenceWarningStateTrackerTest` no longer exists so it won't run.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add app/src/main/java/com/drivesafe/kenya/alerts/AlertManager.kt
@@ -1555,10 +1552,12 @@ private fun String.toStatus(): PolicePresenceStatus = when (this) {
 }
 ```
 
-- [ ] **Step 5: Compile check**
+- [ ] **Step 5: Compile check — expect only known failures**
 
-Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin -q`
-Expected: still fails only on the known `MainActivity.kt` call sites (`fetchActiveAlerts`/`confirmPresent`/`confirmNotPresent`/old `evaluatePolicePresence` signature) — fixed in Task 11. No errors inside `data/police/*` or `alerts/PolicePresenceAlert.kt`.
+As in Task 4, the whole module fails to compile until Task 11 fixes every call site — do not run `testDebugUnitTest` here.
+
+Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin 2>&1 | grep -E "error:|e: "`
+Expected: every error is in `MainActivity.kt`, referencing `fetchActiveAlerts`, `confirmPresent`, `confirmNotPresent`, or the old `evaluatePolicePresence` signature — all fixed in Task 11. No errors inside `data/police/*` or `alerts/PolicePresenceAlert.kt`.
 
 - [ ] **Step 6: Commit**
 
@@ -1809,14 +1808,16 @@ private fun DriveThroughConfirmOverlay(
 }
 ```
 
-- [ ] **Step 5: Update the two `@Preview` composables to pass the new parameters explicitly (optional but recommended for compile safety)**
+- [ ] **Step 5: Leave the two `@Preview` composables untouched**
 
-The default values (`= null`, `= { _, _ -> }`) mean `DriveSafeHomeScreenLightPreview`/`DriveSafeHomeScreenDarkPreview` still compile unchanged — no edit strictly required. Skip unless you want to preview the overlay, in which case pass `driveThroughPrompt = previewNearbyCamera().let { /* construct a PolicePresenceAlert */ }` — not required for this task.
+The default parameter values (`= null`, `= { _, _ -> }`) on `driveThroughPrompt`/`onDriveThroughAnswer` mean `DriveSafeHomeScreenLightPreview`/`DriveSafeHomeScreenDarkPreview` (which don't pass those arguments) keep compiling unchanged. No edit needed for this task.
 
-- [ ] **Step 6: Compile check**
+- [ ] **Step 6: Compile check — expect only known failures**
 
-Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin -q`
-Expected: no errors originating in `DrivingScreen.kt`. (`MainActivity.kt` still has known pending call-site errors, fixed in Task 11.)
+As in Task 4, the whole module fails to compile until Task 11 fixes every call site — do not run `testDebugUnitTest` here.
+
+Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin 2>&1 | grep -E "error:|e: "`
+Expected: no errors originating in `DrivingScreen.kt`. Every reported error is in `MainActivity.kt` (known pending call-site errors, fixed in Task 11).
 
 - [ ] **Step 7: Commit**
 
@@ -1894,10 +1895,12 @@ Replace with:
 }
 ```
 
-- [ ] **Step 3: Compile check**
+- [ ] **Step 3: Compile check — expect only known failures**
 
-Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin -q`
-Expected: same known pending errors as before (unified confirm callbacks, `evaluatePolicePresence` signature) — nothing new introduced by this step.
+As in Task 4, the whole module fails to compile until Task 11 fixes every call site — do not run `testDebugUnitTest` here.
+
+Run: `JAVA_HOME=/Users/ronojak/Library/Java/JavaVirtualMachines/jdk-17.0.2+8/Contents/Home ./gradlew :app:compileDebugKotlin 2>&1 | grep -E "error:|e: "`
+Expected: same known pending errors as before this step (unified confirm callbacks, `evaluatePolicePresence` signature) — this task only touched poll-interval constants, so no new errors should appear beyond what Tasks 4/8/9 already left pending.
 
 - [ ] **Step 4: Commit**
 
