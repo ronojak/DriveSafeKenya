@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from .models import PolicePresenceAlert
+from .models import PolicePresenceAlert, PolicePresenceConfirmation
 
 
 def _nairobi_coords():
@@ -36,6 +36,17 @@ class PolicePresenceModelTest(TestCase):
         alert.refresh_status()
         alert.refresh_from_db()
         self.assertEqual(alert.status, PolicePresenceAlert.STATUS_NEEDS_CONFIRMATION)
+
+    def test_default_expiry_is_fifty_minutes(self):
+        before = timezone.now()
+        alert = PolicePresenceAlert.objects.create(latitude=-1.2921, longitude=36.8219)
+        expected_min = before + timezone.timedelta(minutes=49)
+        expected_max = before + timezone.timedelta(minutes=51)
+        self.assertTrue(expected_min <= alert.expires_at <= expected_max)
+
+    def test_last_confirmed_at_defaults_to_none(self):
+        alert = PolicePresenceAlert.objects.create(latitude=-1.2921, longitude=36.8219)
+        self.assertIsNone(alert.last_confirmed_at)
 
 
 class ReportViewTest(TestCase):
@@ -119,3 +130,18 @@ class ConfirmViewTest(TestCase):
         self.assertEqual(res.status_code, 200)
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.status, PolicePresenceAlert.STATUS_NOT_PRESENT)
+
+
+class PolicePresenceConfirmationModelTest(TestCase):
+
+    def test_unique_together_alert_and_device_hash(self):
+        alert = PolicePresenceAlert.objects.create(latitude=-1.2921, longitude=36.8219)
+        PolicePresenceConfirmation.objects.create(
+            alert=alert, device_hash="dev1", present=True,
+            latitude=-1.2921, longitude=36.8219
+        )
+        with self.assertRaises(Exception):
+            PolicePresenceConfirmation.objects.create(
+                alert=alert, device_hash="dev1", present=False,
+                latitude=-1.2921, longitude=36.8219
+            )
