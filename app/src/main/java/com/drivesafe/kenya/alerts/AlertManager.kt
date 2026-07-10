@@ -27,7 +27,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
     private val lastAlertTimes = mutableMapOf<AlertType, Long>()
     private var lastZoneId: String? = null
     private val warningStateTracker = CameraWarningStateTracker()
-    private val policeWarningStateTracker = PolicePresenceWarningStateTracker()
+    private val proximityAlertEngine = ProximityAlertEngine()
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -93,32 +93,51 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun evaluatePolicePresence(
-        nearbyPolice: NearbyPolicePresenceResult?,
+        gpsFix: com.drivesafe.kenya.location.LocationService.GpsFix?,
+        cachedAlerts: List<PolicePresenceAlert>,
         voiceEnabled: Boolean = true,
         vibrationEnabled: Boolean = true
     ) {
-        val nearbyIds = if (nearbyPolice?.isWithinWarningRadius == true) {
-            setOf(nearbyPolice.alert.id)
-        } else emptySet()
-        policeWarningStateTracker.updateNearbyAlerts(nearbyIds)
+        if (gpsFix == null) return
 
-        if (nearbyPolice == null || !nearbyPolice.isWithinWarningRadius) return
+        val triggers = proximityAlertEngine.evaluate(
+            driverLat = gpsFix.latitude,
+            driverLng = gpsFix.longitude,
+            speedMps = gpsFix.speedMps,
+            bearingDeg = gpsFix.bearingDeg,
+            hasBearing = gpsFix.hasBearing,
+            alerts = cachedAlerts
+        )
 
-        if (isCooldownExpired(AlertType.POLICE_PRESENCE) &&
-            policeWarningStateTracker.shouldWarn(nearbyPolice.alert.id)
-        ) {
-            if (voiceEnabled) speak(POLICE_VOICE_MESSAGE)
-            if (vibrationEnabled) vibrate(AlertType.NEARBY_CAMERA)
-            lastAlertTimes[AlertType.POLICE_PRESENCE] = SystemClock.elapsedRealtime()
+        for (trigger in triggers) {
+            when (trigger) {
+                is ProximityAlertEngine.Trigger.Initial -> {
+                    if (voiceEnabled) speak(buildPoliceInitialMessage(trigger.distanceMeters))
+                    if (vibrationEnabled) vibrate(AlertType.POLICE_PRESENCE)
+                }
+                is ProximityAlertEngine.Trigger.Escalation -> {
+                    if (voiceEnabled) speak(buildPoliceEscalationMessage())
+                    if (vibrationEnabled) vibrate(AlertType.POLICE_PRESENCE)
+                }
+            }
         }
     }
+
+    fun hasAlertedProximity(alertId: String): Boolean = proximityAlertEngine.hasAlerted(alertId)
+
+    private fun buildPoliceInitialMessage(distanceMeters: Float): String {
+        val km = distanceMeters / 1000f
+        return "Police reported ${"%.1f".format(km)} kilometres ahead."
+    }
+
+    private fun buildPoliceEscalationMessage(): String = "Police 400 metres ahead."
 
     fun reset() {
         tts?.stop()
         lastAlertTimes.clear()
         lastZoneId = null
         warningStateTracker.reset()
-        policeWarningStateTracker.reset()
+        proximityAlertEngine.reset()
     }
 
     fun shutdown() {
@@ -129,7 +148,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         lastAlertTimes.clear()
         lastZoneId = null
         warningStateTracker.reset()
-        policeWarningStateTracker.reset()
+        proximityAlertEngine.reset()
     }
 
     private fun isCooldownExpired(type: AlertType): Boolean {
@@ -191,7 +210,6 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
         private const val COOLDOWN_OVERSPEED_MS = 15_000L
         private const val COOLDOWN_STRONG_MS = 15_000L
         private const val COOLDOWN_POLICE_MS = 15_000L
-        const val POLICE_VOICE_MESSAGE = "Police checkpoint reported ahead. Drive carefully."
         private val VIBRATE_NEARBY = longArrayOf(0, 200)
         private val VIBRATE_OVERSPEED = longArrayOf(0, 300, 100, 300)
     }
