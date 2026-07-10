@@ -8,6 +8,7 @@ class PolicePresenceAlertSerializer(serializers.ModelSerializer):
     reported_at = serializers.DateTimeField(read_only=True)
     confirmation_required_after = serializers.DateTimeField(read_only=True)
     expires_at = serializers.DateTimeField(read_only=True)
+    last_confirmed_at = serializers.DateTimeField(read_only=True, allow_null=True)
     present_confirmations = serializers.IntegerField(read_only=True)
     not_present_confirmations = serializers.IntegerField(read_only=True)
 
@@ -20,6 +21,7 @@ class PolicePresenceAlertSerializer(serializers.ModelSerializer):
             "reported_at",
             "confirmation_required_after",
             "expires_at",
+            "last_confirmed_at",
             "status",
             "present_confirmations",
             "not_present_confirmations",
@@ -30,6 +32,7 @@ class PolicePresenceAlertSerializer(serializers.ModelSerializer):
             "reported_at",
             "confirmation_required_after",
             "expires_at",
+            "last_confirmed_at",
             "status",
             "present_confirmations",
             "not_present_confirmations",
