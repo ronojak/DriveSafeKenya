@@ -150,95 +150,104 @@ fun DriveSafeHomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        DriveSafeTopBar(
-            isLocationAvailable = isLocationAvailable,
-            themeMode = themeMode,
-            onToggleTheme = onToggleTheme,
-            colors = colors
-        )
-
-        SpeedGauge(
-            speedKmh = speedKmh,
-            speedLimitKmh = speedLimitKmh,
-            isOverspeed = isOverspeed,
-            colors = colors,
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 260.dp, max = 340.dp)
-                .aspectRatio(1.22f)
-        )
-
-        CameraZoneCard(
-            nearbyCamera = nearbyCamera,
-            colors = colors
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            StatCard(
-                label = "Limit",
-                value = formattedLimit.value,
-                unit = formattedLimit.unit,
-                icon = Icons.Filled.Speed,
-                iconContentDescription = "Speed limit",
-                colors = colors,
-                modifier = Modifier.weight(1f)
+            DriveSafeTopBar(
+                isLocationAvailable = isLocationAvailable,
+                themeMode = themeMode,
+                onToggleTheme = onToggleTheme,
+                colors = colors
             )
-            StatCard(
-                label = "Distance",
-                value = formattedDistance.value,
-                unit = formattedDistance.unit,
-                icon = Icons.Filled.LocationOn,
-                iconContentDescription = "Distance to camera zone",
-                colors = colors,
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                label = "Zones Loaded",
-                value = cameraZoneCount.toString(),
-                unit = "zones",
-                icon = Icons.Filled.Shield,
-                iconContentDescription = "Camera zones loaded",
-                colors = colors,
-                modifier = Modifier.weight(1f)
-            )
-        }
 
-        LocationStatusCard(
-            isLocationAvailable = isLocationAvailable,
-            colors = colors
-        )
+            SpeedGauge(
+                speedKmh = speedKmh,
+                speedLimitKmh = speedLimitKmh,
+                isOverspeed = isOverspeed,
+                colors = colors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 260.dp, max = 340.dp)
+                    .aspectRatio(1.22f)
+            )
 
-        if (nearbyPoliceAlert != null && nearbyPoliceAlert.isWithinWarningRadius) {
-            if (nearbyPoliceAlert.needsConfirmation) {
-                PoliceConfirmCard(
-                    result = nearbyPoliceAlert,
-                    onConfirmPresent = { onConfirmPolicePresent(nearbyPoliceAlert.alert.id) },
-                    onConfirmNotPresent = { onConfirmPoliceNotPresent(nearbyPoliceAlert.alert.id) },
-                    colors = colors
+            CameraZoneCard(
+                nearbyCamera = nearbyCamera,
+                colors = colors
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatCard(
+                    label = "Limit",
+                    value = formattedLimit.value,
+                    unit = formattedLimit.unit,
+                    icon = Icons.Filled.Speed,
+                    iconContentDescription = "Speed limit",
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
                 )
-            } else {
-                PoliceCheckpointCard(result = nearbyPoliceAlert, colors = colors)
+                StatCard(
+                    label = "Distance",
+                    value = formattedDistance.value,
+                    unit = formattedDistance.unit,
+                    icon = Icons.Filled.LocationOn,
+                    iconContentDescription = "Distance to camera zone",
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    label = "Zones Loaded",
+                    value = cameraZoneCount.toString(),
+                    unit = "zones",
+                    icon = Icons.Filled.Shield,
+                    iconContentDescription = "Camera zones loaded",
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
+                )
             }
+
+            LocationStatusCard(
+                isLocationAvailable = isLocationAvailable,
+                colors = colors
+            )
+
+            if (nearbyPoliceAlert != null && nearbyPoliceAlert.isWithinWarningRadius) {
+                if (nearbyPoliceAlert.needsConfirmation) {
+                    PoliceConfirmCard(
+                        result = nearbyPoliceAlert,
+                        onConfirmPresent = { onConfirmPolicePresent(nearbyPoliceAlert.alert.id) },
+                        onConfirmNotPresent = { onConfirmPoliceNotPresent(nearbyPoliceAlert.alert.id) },
+                        colors = colors
+                    )
+                } else {
+                    PoliceCheckpointCard(result = nearbyPoliceAlert, colors = colors)
+                }
+            }
+
+            SafetyDisclaimer(colors = colors)
         }
 
-        DrivingActionButtons(
-            onStopDriving = onStopDriving,
-            onReportPolicePresence = onReportPolicePresence,
-            colors = colors
-        )
+        // Pinned footer: stays on-screen regardless of scroll position above.
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (policeReportMessage != null) {
+                InlineStatusMessage(message = policeReportMessage, colors = colors)
+            }
 
-        if (policeReportMessage != null) {
-            InlineStatusMessage(message = policeReportMessage, colors = colors)
+            DrivingActionButtons(
+                onStopDriving = onStopDriving,
+                onReportPolicePresence = onReportPolicePresence,
+                colors = colors
+            )
         }
-
-        SafetyDisclaimer(colors = colors)
     }
 }
 
