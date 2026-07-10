@@ -973,8 +973,17 @@ class ConfirmViewTest(TestCase):
             format="json",
         )
 
+    # NOTE: the confirm rate limit (_is_confirm_rate_limited) is a process-level
+    # Django cache keyed only by device_hash, with a 120s timeout — it is NOT
+    # reset between test methods the way the DB is (TestCase only rolls back
+    # the DB transaction). Every device_hash below is therefore unique per test
+    # method so no two tests can spuriously rate-limit or duplicate-block each
+    # other, matching the existing convention in ReportViewTest above (which
+    # uses "abc123"/"device-rate-test"/"d1"/"d2" — one unique hash per test,
+    # never reused across unrelated test methods).
+
     def test_present_confirmation_sets_status_and_last_confirmed_at(self):
-        res = self._confirm("voter1", True)
+        res = self._confirm("present-basic-1", True)
         self.assertEqual(res.status_code, 200)
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.status, PolicePresenceAlert.STATUS_CONFIRMED_PRESENT)
@@ -982,22 +991,22 @@ class ConfirmViewTest(TestCase):
         self.assertIsNotNone(self.alert.last_confirmed_at)
 
     def test_two_distinct_devices_saying_gone_clears_the_alert(self):
-        res1 = self._confirm("voter1", False)
+        res1 = self._confirm("gone-clears-1", False)
         self.assertEqual(res1.status_code, 200)
-        res2 = self._confirm("voter2", False)
+        res2 = self._confirm("gone-clears-2", False)
         self.assertEqual(res2.status_code, 200)
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.status, PolicePresenceAlert.STATUS_NOT_PRESENT)
 
     def test_cleared_alert_excluded_from_active(self):
-        self._confirm("voter1", False)
-        self._confirm("voter2", False)
+        self._confirm("excluded-active-1", False)
+        self._confirm("excluded-active-2", False)
         res = self.client.get("/api/police-presence/active?lat=-1.2921&lon=36.8219")
         self.assertEqual(len(res.data["alerts"]), 0)
 
     def test_present_vote_resets_gone_counter(self):
-        self._confirm("voter1", False)
-        self._confirm("voter2", True)
+        self._confirm("reset-counter-1", False)
+        self._confirm("reset-counter-2", True)
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.not_present_confirmations, 0)
         self.assertEqual(self.alert.status, PolicePresenceAlert.STATUS_CONFIRMED_PRESENT)
@@ -1008,13 +1017,13 @@ class ConfirmViewTest(TestCase):
 
     def test_confirm_rejected_when_more_than_500m_away(self):
         # ~2km north of the alert
-        res = self._confirm("voter1", True, lat=-1.2741, lon=36.8219)
+        res = self._confirm("too-far-1", True, lat=-1.2741, lon=36.8219)
         self.assertEqual(res.status_code, 400)
 
     def test_device_cannot_confirm_the_same_alert_twice(self):
-        first = self._confirm("voter1", True)
+        first = self._confirm("duplicate-vote-1", True)
         self.assertEqual(first.status_code, 200)
-        second = self._confirm("voter1", False)
+        second = self._confirm("duplicate-vote-1", False)
         self.assertEqual(second.status_code, 429)
 
     def test_confirm_requires_device_hash(self):
@@ -1028,15 +1037,15 @@ class ConfirmViewTest(TestCase):
     def test_confirm_on_unknown_alert_returns_404(self):
         res = self.client.post(
             "/api/police-presence/00000000-0000-0000-0000-000000000000/confirm",
-            {"latitude": -1.2921, "longitude": 36.8219, "device_hash": "voter1", "present": True},
+            {"latitude": -1.2921, "longitude": 36.8219, "device_hash": "unknown-alert-1", "present": True},
             format="json",
         )
         self.assertEqual(res.status_code, 404)
 
     def test_confirm_on_already_cleared_alert_returns_400(self):
-        self._confirm("voter1", False)
-        self._confirm("voter2", False)
-        res = self._confirm("voter3", True)
+        self._confirm("already-cleared-1", False)
+        self._confirm("already-cleared-2", False)
+        res = self._confirm("already-cleared-3", True)
         self.assertEqual(res.status_code, 400)
 ```
 
