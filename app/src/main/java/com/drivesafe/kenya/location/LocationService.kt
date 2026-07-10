@@ -19,11 +19,23 @@ class LocationService(context: Context) {
     private val client: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
 
+    data class GpsFix(
+        val latitude: Double,
+        val longitude: Double,
+        val speedMps: Float,
+        val hasSpeed: Boolean,
+        val bearingDeg: Float,
+        val hasBearing: Boolean
+    )
+
     private val _speedKmh = MutableStateFlow<Double?>(null)
     val speedKmh: StateFlow<Double?> = _speedKmh.asStateFlow()
 
     private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
     val userLocation: StateFlow<Pair<Double, Double>?> = _userLocation.asStateFlow()
+
+    private val _gpsFix = MutableStateFlow<GpsFix?>(null)
+    val gpsFix: StateFlow<GpsFix?> = _gpsFix.asStateFlow()
 
     private val _isActive = MutableStateFlow(false)
     val isActive: StateFlow<Boolean> = _isActive.asStateFlow()
@@ -44,6 +56,14 @@ class LocationService(context: Context) {
                 null
             }
             _userLocation.value = Pair(location.latitude, location.longitude)
+            _gpsFix.value = GpsFix(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                speedMps = if (location.hasSpeed()) location.speed else 0f,
+                hasSpeed = location.hasSpeed(),
+                bearingDeg = if (location.hasBearing()) location.bearing else 0f,
+                hasBearing = location.hasBearing()
+            )
         }
     }
 
@@ -63,6 +83,7 @@ class LocationService(context: Context) {
         _isActive.value = false
         _speedKmh.value = null
         _userLocation.value = null
+        _gpsFix.value = null
         Log.d(TAG, "Location updates stopped")
     }
 
