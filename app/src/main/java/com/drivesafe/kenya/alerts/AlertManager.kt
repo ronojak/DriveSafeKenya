@@ -127,7 +127,7 @@ class AlertManager(context: Context) : TextToSpeech.OnInitListener {
 
     private fun buildPoliceInitialMessage(distanceMeters: Float): String {
         val km = distanceMeters / 1000f
-        return "Police reported ${"%.1f".format(km)} kilometres ahead."
+        return "Police reported ${String.format(Locale.US, "%.1f", km)} kilometres ahead."
     }
 
     private fun buildPoliceEscalationMessage(): String = "Police 400 metres ahead."

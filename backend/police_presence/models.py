@@ -7,6 +7,8 @@ def _fifteen_minutes_from_now():
     return timezone.now() + timezone.timedelta(minutes=15)
 
 
+# Retained: referenced by 0001_initial.py's frozen historical migration state.
+# Do not remove even though no current model field uses it as a live default.
 def _thirty_minutes_from_now():
     return timezone.now() + timezone.timedelta(minutes=30)
 

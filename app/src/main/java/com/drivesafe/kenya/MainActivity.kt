@@ -303,14 +303,28 @@ class MainActivity : ComponentActivity() {
                                 policeReportMessage = policeReportMessage,
                                 onConfirmPolicePresent = { alertId ->
                                     val loc = userLocation
-                                    if (loc != null) {
-                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present = true) }
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present = true)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
                                     }
                                 },
                                 onConfirmPoliceNotPresent = { alertId ->
                                     val loc = userLocation
-                                    if (loc != null) {
-                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present = false) }
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present = false)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
                                     }
                                 },
                                 driveThroughPrompt = driveThroughPromptAlertId?.let { id ->
@@ -319,8 +333,15 @@ class MainActivity : ComponentActivity() {
                                 onDriveThroughAnswer = { alertId, present ->
                                     val loc = userLocation
                                     driveThroughPromptAlertId = null
-                                    if (loc != null) {
-                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present) }
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
                                     }
                                 },
                                 modifier = Modifier.padding(innerPadding)
