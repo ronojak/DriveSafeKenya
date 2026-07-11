@@ -1,17 +1,22 @@
 import math
 
 from django.core.cache import cache
+from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import PolicePresenceAlert
+from .models import PolicePresenceAlert, PolicePresenceConfirmation
 from .serializers import PolicePresenceAlertSerializer
 
 # ── Kenya bounding box ──────────────────────────────────────────────────────
 KENYA_LAT_MIN, KENYA_LAT_MAX = -5.0, 5.5
 KENYA_LON_MIN, KENYA_LON_MAX = 33.0, 42.5
+
+CONFIRM_PROXIMITY_METERS = 500
+CONFIRM_RATE_LIMIT_SECONDS = 120
+ALERT_TTL_MINUTES = 50
 
 
 def _validate_kenya_coordinates(lat, lon):
@@ -52,14 +57,14 @@ def _is_report_rate_limited(device_hash: str) -> bool:
     return False
 
 
-def _has_already_acted(device_hash: str, alert_id: str, action: str) -> bool:
-    """Prevent a device from voting on the same alert twice."""
+def _is_confirm_rate_limited(device_hash: str) -> bool:
+    """Block more than one confirmation per device every 2 minutes, across alerts."""
     if not device_hash:
         return False
-    key = f"pp_{action}_{alert_id}_{device_hash}"
+    key = f"pp_confirm_rl_{device_hash}"
     if cache.get(key):
         return True
-    cache.set(key, True, timeout=3600)
+    cache.set(key, True, timeout=CONFIRM_RATE_LIMIT_SECONDS)
     return False
 
 
@@ -130,8 +135,21 @@ def active_police_presence(request):
 
 
 @api_view(["POST"])
-def confirm_police_present(request, alert_id):
+def confirm_police_presence(request, alert_id):
+    lat = request.data.get("latitude")
+    lon = request.data.get("longitude")
     device_hash = (request.data.get("device_hash") or "").strip()[:64]
+    present = request.data.get("present")
+
+    if not device_hash:
+        return Response({"error": "device_hash is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not isinstance(present, bool):
+        return Response({"error": "present must be a boolean"}, status=status.HTTP_400_BAD_REQUEST)
+
+    ok, err = _validate_kenya_coordinates(lat, lon)
+    if not ok:
+        return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         alert = PolicePresenceAlert.objects.get(pk=alert_id)
@@ -141,36 +159,50 @@ def confirm_police_present(request, alert_id):
     if alert.status in (PolicePresenceAlert.STATUS_EXPIRED, PolicePresenceAlert.STATUS_NOT_PRESENT):
         return Response({"error": "Alert is no longer active"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if _has_already_acted(device_hash, str(alert_id), "present"):
+    if device_hash == alert.reported_by_device_hash:
+        return Response(
+            {"error": "The reporting device cannot confirm its own report"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    distance = _haversine_meters(float(lat), float(lon), alert.latitude, alert.longitude)
+    if distance > CONFIRM_PROXIMITY_METERS:
+        return Response(
+            {"error": f"You must be within {CONFIRM_PROXIMITY_METERS}m of the location to confirm"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if PolicePresenceConfirmation.objects.filter(alert=alert, device_hash=device_hash).exists():
         return Response({"error": "Already confirmed"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-    alert.present_confirmations += 1
-    alert.status = PolicePresenceAlert.STATUS_CONFIRMED_PRESENT
-    # Extend by 15 more minutes from now
-    now = timezone.now()
-    alert.confirmation_required_after = now + timezone.timedelta(minutes=15)
-    alert.expires_at = now + timezone.timedelta(minutes=30)
-    alert.save()
-    return Response(PolicePresenceAlertSerializer(alert).data)
-
-
-@api_view(["POST"])
-def confirm_police_not_present(request, alert_id):
-    device_hash = (request.data.get("device_hash") or "").strip()[:64]
+    if _is_confirm_rate_limited(device_hash):
+        return Response(
+            {"error": "Too many confirmations. Please wait before confirming again."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
 
     try:
-        alert = PolicePresenceAlert.objects.get(pk=alert_id)
-    except (PolicePresenceAlert.DoesNotExist, Exception):
-        return Response({"error": "Alert not found"}, status=status.HTTP_404_NOT_FOUND)
+        PolicePresenceConfirmation.objects.create(
+            alert=alert,
+            device_hash=device_hash,
+            present=present,
+            latitude=float(lat),
+            longitude=float(lon),
+        )
+    except IntegrityError:
+        return Response({"error": "Already confirmed"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-    if alert.status in (PolicePresenceAlert.STATUS_EXPIRED, PolicePresenceAlert.STATUS_NOT_PRESENT):
-        return Response({"error": "Alert is no longer active"}, status=status.HTTP_400_BAD_REQUEST)
-
-    if _has_already_acted(device_hash, str(alert_id), "not_present"):
-        return Response({"error": "Already voted"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-
-    alert.not_present_confirmations += 1
-    if alert.not_present_confirmations >= PolicePresenceAlert.NOT_PRESENT_THRESHOLD:
-        alert.status = PolicePresenceAlert.STATUS_NOT_PRESENT
+    now = timezone.now()
+    if present:
+        alert.present_confirmations += 1
+        alert.not_present_confirmations = 0
+        alert.status = PolicePresenceAlert.STATUS_CONFIRMED_PRESENT
+        alert.last_confirmed_at = now
+    else:
+        alert.not_present_confirmations += 1
+        if alert.not_present_confirmations >= PolicePresenceAlert.NOT_PRESENT_THRESHOLD:
+            alert.status = PolicePresenceAlert.STATUS_NOT_PRESENT
+    alert.expires_at = now + timezone.timedelta(minutes=ALERT_TTL_MINUTES)
     alert.save()
+
     return Response(PolicePresenceAlertSerializer(alert).data)

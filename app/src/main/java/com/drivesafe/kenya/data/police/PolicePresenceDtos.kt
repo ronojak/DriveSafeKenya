@@ -8,8 +8,11 @@ data class ReportPolicePresenceRequest(
     @SerializedName("device_hash") val deviceHash: String
 )
 
-data class ConfirmRequest(
-    @SerializedName("device_hash") val deviceHash: String
+data class ConfirmPresenceRequest(
+    @SerializedName("latitude") val latitude: Double,
+    @SerializedName("longitude") val longitude: Double,
+    @SerializedName("device_hash") val deviceHash: String,
+    @SerializedName("present") val present: Boolean
 )
 
 data class PolicePresenceAlertDto(
@@ -19,6 +22,7 @@ data class PolicePresenceAlertDto(
     @SerializedName("reported_at") val reportedAt: String,
     @SerializedName("confirmation_required_after") val confirmationRequiredAfter: String,
     @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("last_confirmed_at") val lastConfirmedAt: String?,
     val status: String,
     @SerializedName("present_confirmations") val presentConfirmations: Int,
     @SerializedName("not_present_confirmations") val notPresentConfirmations: Int,

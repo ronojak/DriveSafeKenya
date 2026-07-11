@@ -7,8 +7,14 @@ def _fifteen_minutes_from_now():
     return timezone.now() + timezone.timedelta(minutes=15)
 
 
+# Retained: referenced by 0001_initial.py's frozen historical migration state.
+# Do not remove even though no current model field uses it as a live default.
 def _thirty_minutes_from_now():
     return timezone.now() + timezone.timedelta(minutes=30)
+
+
+def _fifty_minutes_from_now():
+    return timezone.now() + timezone.timedelta(minutes=50)
 
 
 class PolicePresenceAlert(models.Model):
@@ -26,7 +32,7 @@ class PolicePresenceAlert(models.Model):
         (STATUS_EXPIRED, "Expired"),
     ]
 
-    # Two not-present votes marks the alert as dismissed
+    # Two distinct-device "gone" votes marks the alert as cleared
     NOT_PRESENT_THRESHOLD = 2
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -34,7 +40,8 @@ class PolicePresenceAlert(models.Model):
     longitude = models.FloatField()
     reported_at = models.DateTimeField(auto_now_add=True)
     confirmation_required_after = models.DateTimeField(default=_fifteen_minutes_from_now)
-    expires_at = models.DateTimeField(default=_thirty_minutes_from_now)
+    expires_at = models.DateTimeField(default=_fifty_minutes_from_now)
+    last_confirmed_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     present_confirmations = models.IntegerField(default=0)
     not_present_confirmations = models.IntegerField(default=0)
@@ -61,3 +68,24 @@ class PolicePresenceAlert(models.Model):
         elif now > self.confirmation_required_after and self.status == self.STATUS_ACTIVE:
             self.status = self.STATUS_NEEDS_CONFIRMATION
         self.save(update_fields=["status", "updated_at"])
+
+
+class PolicePresenceConfirmation(models.Model):
+    """One device's vote on whether a checkpoint is still present. A device
+    may vote at most once per alert (see Meta.unique_together)."""
+
+    alert = models.ForeignKey(
+        PolicePresenceAlert, related_name="confirmations", on_delete=models.CASCADE
+    )
+    device_hash = models.CharField(max_length=64)
+    present = models.BooleanField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("alert", "device_hash")
+
+    def __str__(self):
+        vote = "present" if self.present else "gone"
+        return f"{vote} vote on {self.alert_id} by {self.device_hash[:8]}"

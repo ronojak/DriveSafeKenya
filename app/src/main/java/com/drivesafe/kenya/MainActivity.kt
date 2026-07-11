@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.drivesafe.kenya.alerts.AlertManager
 import com.drivesafe.kenya.alerts.CameraProximityDetector
+import com.drivesafe.kenya.alerts.DriveThroughTracker
 import com.drivesafe.kenya.alerts.OverspeedDetector
 import com.drivesafe.kenya.alerts.PolicePresenceProximityDetector
 import com.drivesafe.kenya.data.AppThemeMode
@@ -54,6 +55,7 @@ import com.drivesafe.kenya.ui.PaymentUiState
 import com.drivesafe.kenya.ui.RegisterScreen
 import com.drivesafe.kenya.ui.SettingsScreen
 import com.drivesafe.kenya.ui.theme.DriveSafeKenyaTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import kotlin.math.sqrt
@@ -100,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 val isDriving by locationService.isActive.collectAsState()
                 val speedKmh by locationService.speedKmh.collectAsState()
                 val userLocation by locationService.userLocation.collectAsState()
+                val gpsFix by locationService.gpsFix.collectAsState()
                 val settings by settingsRepo.settings.collectAsState(initial = UserSettings())
                 val cameraZones by repository.activeZones.collectAsState(initial = emptyList())
                 val currentSyncMetadata by repository.syncMetadata.collectAsState(initial = null)
@@ -117,6 +120,8 @@ class MainActivity : ComponentActivity() {
                 var policeReportMessage by remember { mutableStateOf<String?>(null) }
                 var lastPoliceFetchTime by remember { mutableLongStateOf(0L) }
                 var lastPoliceFetchLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+                val driveThroughTracker = remember { DriveThroughTracker() }
+                var driveThroughPromptAlertId by remember { mutableStateOf<String?>(null) }
 
                 val scope = rememberCoroutineScope()
 
@@ -138,7 +143,7 @@ class MainActivity : ComponentActivity() {
                     PolicePresenceProximityDetector.findNearest(lat, lng, policeAlerts)
                 }
 
-                // Periodically fetch police alerts while driving: every 2 min or every 1 km
+                // Periodically fetch police alerts while driving: every 45s or every 1 km
                 LaunchedEffect(userLocation, isDriving) {
                     if (!isDriving || userLocation == null) return@LaunchedEffect
                     val (lat, lng) = userLocation!!
@@ -148,8 +153,8 @@ class MainActivity : ComponentActivity() {
                         sqrt((lat - pLat) * (lat - pLat) + (lng - pLng) * (lng - pLng)) * 111_000.0
                     } ?: Double.MAX_VALUE
 
-                    if (elapsedMs >= 120_000L || distanceMoved >= 1_000.0) {
-                        policePresenceRepository.fetchActiveAlerts(lat, lng)
+                    if (elapsedMs >= POLICE_POLL_INTERVAL_MS || distanceMoved >= POLICE_POLL_DISTANCE_METERS) {
+                        policePresenceRepository.fetchActiveAlerts(lat, lng, POLICE_FETCH_RADIUS_METERS)
                         lastPoliceFetchLocation = Pair(lat, lng)
                         lastPoliceFetchTime = now
                     }
@@ -161,10 +166,36 @@ class MainActivity : ComponentActivity() {
                             nearbyCamera, overspeedResult, speedKmh,
                             settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
                         )
+                    }
+                }
+
+                LaunchedEffect(gpsFix) {
+                    val fix = gpsFix
+                    if (isDriving && fix != null) {
                         alertManager.evaluatePolicePresence(
-                            nearbyPoliceAlert,
+                            fix, policeAlerts,
                             settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
                         )
+                        val alreadyAlertedIds = policeAlerts
+                            .filter { alertManager.hasAlertedProximity(it.id) }
+                            .map { it.id }
+                            .toSet()
+                        val promptId = driveThroughTracker.onTick(
+                            fix.latitude, fix.longitude, alreadyAlertedIds, policeAlerts
+                        )
+                        if (promptId != null) {
+                            driveThroughPromptAlertId = promptId
+                        }
+                    }
+                }
+
+                LaunchedEffect(driveThroughPromptAlertId) {
+                    val id = driveThroughPromptAlertId
+                    if (id != null) {
+                        delay(30_000L)
+                        if (driveThroughPromptAlertId == id) {
+                            driveThroughPromptAlertId = null
+                        }
                     }
                 }
 
@@ -251,6 +282,8 @@ class MainActivity : ComponentActivity() {
                                 onStopDriving = {
                                     locationService.stopUpdates()
                                     alertManager.reset()
+                                    driveThroughTracker.reset()
+                                    driveThroughPromptAlertId = null
                                     policeReportMessage = null
                                 },
                                 nearbyPoliceAlert = nearbyPoliceAlert,
@@ -269,10 +302,47 @@ class MainActivity : ComponentActivity() {
                                 },
                                 policeReportMessage = policeReportMessage,
                                 onConfirmPolicePresent = { alertId ->
-                                    scope.launch { policePresenceRepository.confirmPresent(alertId) }
+                                    val loc = userLocation
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present = true)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
+                                    }
                                 },
                                 onConfirmPoliceNotPresent = { alertId ->
-                                    scope.launch { policePresenceRepository.confirmNotPresent(alertId) }
+                                    val loc = userLocation
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present = false)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
+                                    }
+                                },
+                                driveThroughPrompt = driveThroughPromptAlertId?.let { id ->
+                                    policeAlerts.firstOrNull { it.id == id }
+                                },
+                                onDriveThroughAnswer = { alertId, present ->
+                                    val loc = userLocation
+                                    driveThroughPromptAlertId = null
+                                    if (loc == null) {
+                                        policeReportMessage = getString(R.string.police_location_unavailable)
+                                    } else {
+                                        scope.launch {
+                                            when (val r = policePresenceRepository.confirm(alertId, loc.first, loc.second, present)) {
+                                                is PolicePresenceRepository.ConfirmResult.Success -> {}
+                                                is PolicePresenceRepository.ConfirmResult.Failure -> policeReportMessage = r.reason
+                                            }
+                                        }
+                                    }
                                 },
                                 modifier = Modifier.padding(innerPadding)
                             )
@@ -435,5 +505,11 @@ class MainActivity : ComponentActivity() {
         ) ?: "unknown"
         val bytes = MessageDigest.getInstance("SHA-256").digest(androidId.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        private const val POLICE_POLL_INTERVAL_MS = 45_000L
+        private const val POLICE_POLL_DISTANCE_METERS = 1_000.0
+        private const val POLICE_FETCH_RADIUS_METERS = 12_000
     }
 }

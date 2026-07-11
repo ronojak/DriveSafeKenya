@@ -76,4 +76,7 @@
     <string name="police_confirm_present">Police Present</string>
     <string name="police_confirm_not_present">Not Present</string>
     <string name="police_report_failed">Could not submit report. Please try again.</string>
+    <string name="drive_through_prompt_question">Is the police checkpoint still there?</string>
+    <string name="drive_through_still_there">Bado wapo / Still there</string>
+    <string name="drive_through_gone">Wameondoka / Gone</string>
 </resources>

@@ -72,6 +72,7 @@ import com.drivesafe.kenya.alerts.NearbyCameraResult
 import com.drivesafe.kenya.alerts.NearbyPolicePresenceResult
 import com.drivesafe.kenya.alerts.OverspeedResult
 import com.drivesafe.kenya.alerts.OverspeedStatus
+import com.drivesafe.kenya.alerts.PolicePresenceAlert
 import com.drivesafe.kenya.data.AppThemeMode
 import com.drivesafe.kenya.data.CameraZone
 import com.drivesafe.kenya.ui.theme.DriveSafeKenyaTheme
@@ -83,6 +84,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private const val GaugeMaxSpeedKmh = 140f
+private const val CONFIRM_ACTIONABLE_RADIUS_METERS = 500f
 
 @Composable
 fun DrivingScreen(
@@ -100,6 +102,8 @@ fun DrivingScreen(
     policeReportMessage: String? = null,
     onConfirmPolicePresent: (String) -> Unit = {},
     onConfirmPoliceNotPresent: (String) -> Unit = {},
+    driveThroughPrompt: PolicePresenceAlert? = null,
+    onDriveThroughAnswer: (String, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     if (keepScreenOn) KeepScreenOn()
@@ -118,6 +122,8 @@ fun DrivingScreen(
         policeReportMessage = policeReportMessage,
         onConfirmPolicePresent = onConfirmPolicePresent,
         onConfirmPoliceNotPresent = onConfirmPoliceNotPresent,
+        driveThroughPrompt = driveThroughPrompt,
+        onDriveThroughAnswer = onDriveThroughAnswer,
         modifier = modifier
     )
 }
@@ -137,6 +143,8 @@ fun DriveSafeHomeScreen(
     policeReportMessage: String? = null,
     onConfirmPolicePresent: (String) -> Unit = {},
     onConfirmPoliceNotPresent: (String) -> Unit = {},
+    driveThroughPrompt: PolicePresenceAlert? = null,
+    onDriveThroughAnswer: (String, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val isDark = themeMode == AppThemeMode.DARK
@@ -221,7 +229,9 @@ fun DriveSafeHomeScreen(
             )
 
             if (nearbyPoliceAlert != null && nearbyPoliceAlert.isWithinWarningRadius) {
-                if (nearbyPoliceAlert.needsConfirmation) {
+                if (nearbyPoliceAlert.needsConfirmation &&
+                    nearbyPoliceAlert.distanceMeters <= CONFIRM_ACTIONABLE_RADIUS_METERS
+                ) {
                     PoliceConfirmCard(
                         result = nearbyPoliceAlert,
                         onConfirmPresent = { onConfirmPolicePresent(nearbyPoliceAlert.alert.id) },
@@ -234,6 +244,13 @@ fun DriveSafeHomeScreen(
             }
 
             SafetyDisclaimer(colors = colors)
+        }
+
+        if (driveThroughPrompt != null) {
+            DriveThroughConfirmOverlay(
+                alert = driveThroughPrompt,
+                onAnswer = { present -> onDriveThroughAnswer(driveThroughPrompt.id, present) }
+            )
         }
 
         // Pinned footer: stays on-screen regardless of scroll position above.
@@ -940,6 +957,62 @@ private fun PoliceConfirmCard(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.warning)
                 ) {
                     Text(text = stringResource(R.string.police_confirm_not_present))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DriveThroughConfirmOverlay(
+    alert: PolicePresenceAlert,
+    onAnswer: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2028)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = stringResource(R.string.drive_through_prompt_question),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { onAnswer(true) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 64.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                ) {
+                    Text(
+                        text = stringResource(R.string.drive_through_still_there),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Button(
+                    onClick = { onAnswer(false) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 64.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF667085))
+                ) {
+                    Text(
+                        text = stringResource(R.string.drive_through_gone),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
