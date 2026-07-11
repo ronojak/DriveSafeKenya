@@ -11,6 +11,7 @@ data class PolicePresenceAlert(
     val presentConfirmations: Int = 0,
     val notPresentConfirmations: Int = 0,
     val source: String = "anonymous_community_report",
+    val lastConfirmedAtEpochMillis: Long? = null,
     val localOnly: Boolean = false
 ) {
     fun isActive(): Boolean = status == PolicePresenceStatus.ACTIVE ||

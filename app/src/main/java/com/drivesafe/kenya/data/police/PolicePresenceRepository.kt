@@ -14,9 +14,9 @@ class PolicePresenceRepository(
     private val _alerts = MutableStateFlow<List<PolicePresenceAlert>>(emptyList())
     val alerts: StateFlow<List<PolicePresenceAlert>> = _alerts.asStateFlow()
 
-    suspend fun fetchActiveAlerts(lat: Double, lon: Double) {
+    suspend fun fetchActiveAlerts(lat: Double, lon: Double, radiusMeters: Int = 10_000) {
         try {
-            val response = api.getActive(lat, lon)
+            val response = api.getActive(lat, lon, radiusMeters)
             if (response.isSuccessful) {
                 val body = response.body() ?: return
                 _alerts.value = body.alerts.mapNotNull { it.toDomain() }
@@ -53,27 +53,27 @@ class PolicePresenceRepository(
         data class Failure(val reason: String) : ReportResult()
     }
 
-    suspend fun confirmPresent(alertId: String) {
-        try {
-            val response = api.confirmPresent(alertId, ConfirmRequest(deviceHash))
-            if (response.isSuccessful) {
-                response.body()?.toDomain()?.let { updated ->
-                    _alerts.value = _alerts.value.map { if (it.id == alertId) updated else it }
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    suspend fun confirmNotPresent(alertId: String) {
-        try {
-            val response = api.confirmNotPresent(alertId, ConfirmRequest(deviceHash))
+    suspend fun confirm(alertId: String, lat: Double, lon: Double, present: Boolean): ConfirmResult {
+        return try {
+            val response = api.confirm(alertId, ConfirmPresenceRequest(lat, lon, deviceHash, present))
             if (response.isSuccessful) {
                 response.body()?.toDomain()?.let { updated ->
                     _alerts.value = _alerts.value.map { if (it.id == alertId) updated else it }
                         .filter { it.isActive() }
                 }
+                ConfirmResult.Success
+            } else {
+                val errorBody = response.errorBody()?.string() ?: ""
+                ConfirmResult.Failure(parseErrorField(errorBody))
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            ConfirmResult.Failure("Network error. Check your connection.")
+        }
+    }
+
+    sealed class ConfirmResult {
+        object Success : ConfirmResult()
+        data class Failure(val reason: String) : ConfirmResult()
     }
 }
 
@@ -82,7 +82,7 @@ class PolicePresenceRepository(
 private fun parseErrorField(json: String): String {
     // Extract {"error":"..."} from DRF error responses
     val match = Regex(""""error"\s*:\s*"([^"]+)"""").find(json)
-    return match?.groupValues?.get(1) ?: "Could not submit report."
+    return match?.groupValues?.get(1) ?: "Could not submit request."
 }
 
 // ── DTO → domain conversion ──────────────────────────────────────────────────
@@ -98,7 +98,8 @@ private fun PolicePresenceAlertDto.toDomain(): PolicePresenceAlert? = try {
         status = status.toStatus(),
         presentConfirmations = presentConfirmations,
         notPresentConfirmations = notPresentConfirmations,
-        source = source
+        source = source,
+        lastConfirmedAtEpochMillis = lastConfirmedAt?.toEpochMillis()
     )
 } catch (_: Exception) { null }
 

@@ -26,15 +26,9 @@ interface PolicePresenceApi {
     ): Response<ActiveAlertsDto>
 
     @POST("police-presence/{alertId}/confirm")
-    suspend fun confirmPresent(
+    suspend fun confirm(
         @Path("alertId") alertId: String,
-        @Body body: ConfirmRequest
-    ): Response<PolicePresenceAlertDto>
-
-    @POST("police-presence/{alertId}/not-present")
-    suspend fun confirmNotPresent(
-        @Path("alertId") alertId: String,
-        @Body body: ConfirmRequest
+        @Body body: ConfirmPresenceRequest
     ): Response<PolicePresenceAlertDto>
 
     companion object {
