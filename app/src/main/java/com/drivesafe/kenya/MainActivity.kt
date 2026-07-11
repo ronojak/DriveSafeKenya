@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.drivesafe.kenya.alerts.AlertManager
 import com.drivesafe.kenya.alerts.CameraProximityDetector
+import com.drivesafe.kenya.alerts.DriveThroughTracker
 import com.drivesafe.kenya.alerts.OverspeedDetector
 import com.drivesafe.kenya.alerts.PolicePresenceProximityDetector
 import com.drivesafe.kenya.data.AppThemeMode
@@ -54,6 +55,7 @@ import com.drivesafe.kenya.ui.PaymentUiState
 import com.drivesafe.kenya.ui.RegisterScreen
 import com.drivesafe.kenya.ui.SettingsScreen
 import com.drivesafe.kenya.ui.theme.DriveSafeKenyaTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import kotlin.math.sqrt
@@ -100,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 val isDriving by locationService.isActive.collectAsState()
                 val speedKmh by locationService.speedKmh.collectAsState()
                 val userLocation by locationService.userLocation.collectAsState()
+                val gpsFix by locationService.gpsFix.collectAsState()
                 val settings by settingsRepo.settings.collectAsState(initial = UserSettings())
                 val cameraZones by repository.activeZones.collectAsState(initial = emptyList())
                 val currentSyncMetadata by repository.syncMetadata.collectAsState(initial = null)
@@ -117,6 +120,8 @@ class MainActivity : ComponentActivity() {
                 var policeReportMessage by remember { mutableStateOf<String?>(null) }
                 var lastPoliceFetchTime by remember { mutableLongStateOf(0L) }
                 var lastPoliceFetchLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+                val driveThroughTracker = remember { DriveThroughTracker() }
+                var driveThroughPromptAlertId by remember { mutableStateOf<String?>(null) }
 
                 val scope = rememberCoroutineScope()
 
@@ -161,10 +166,36 @@ class MainActivity : ComponentActivity() {
                             nearbyCamera, overspeedResult, speedKmh,
                             settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
                         )
+                    }
+                }
+
+                LaunchedEffect(gpsFix) {
+                    val fix = gpsFix
+                    if (isDriving && fix != null) {
                         alertManager.evaluatePolicePresence(
-                            nearbyPoliceAlert,
+                            fix, policeAlerts,
                             settings.voiceAlertsEnabled, settings.vibrationAlertsEnabled
                         )
+                        val alreadyAlertedIds = policeAlerts
+                            .filter { alertManager.hasAlertedProximity(it.id) }
+                            .map { it.id }
+                            .toSet()
+                        val promptId = driveThroughTracker.onTick(
+                            fix.latitude, fix.longitude, alreadyAlertedIds, policeAlerts
+                        )
+                        if (promptId != null) {
+                            driveThroughPromptAlertId = promptId
+                        }
+                    }
+                }
+
+                LaunchedEffect(driveThroughPromptAlertId) {
+                    val id = driveThroughPromptAlertId
+                    if (id != null) {
+                        delay(30_000L)
+                        if (driveThroughPromptAlertId == id) {
+                            driveThroughPromptAlertId = null
+                        }
                     }
                 }
 
@@ -251,6 +282,8 @@ class MainActivity : ComponentActivity() {
                                 onStopDriving = {
                                     locationService.stopUpdates()
                                     alertManager.reset()
+                                    driveThroughTracker.reset()
+                                    driveThroughPromptAlertId = null
                                     policeReportMessage = null
                                 },
                                 nearbyPoliceAlert = nearbyPoliceAlert,
@@ -269,10 +302,26 @@ class MainActivity : ComponentActivity() {
                                 },
                                 policeReportMessage = policeReportMessage,
                                 onConfirmPolicePresent = { alertId ->
-                                    scope.launch { policePresenceRepository.confirmPresent(alertId) }
+                                    val loc = userLocation
+                                    if (loc != null) {
+                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present = true) }
+                                    }
                                 },
                                 onConfirmPoliceNotPresent = { alertId ->
-                                    scope.launch { policePresenceRepository.confirmNotPresent(alertId) }
+                                    val loc = userLocation
+                                    if (loc != null) {
+                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present = false) }
+                                    }
+                                },
+                                driveThroughPrompt = driveThroughPromptAlertId?.let { id ->
+                                    policeAlerts.firstOrNull { it.id == id }
+                                },
+                                onDriveThroughAnswer = { alertId, present ->
+                                    val loc = userLocation
+                                    driveThroughPromptAlertId = null
+                                    if (loc != null) {
+                                        scope.launch { policePresenceRepository.confirm(alertId, loc.first, loc.second, present) }
+                                    }
                                 },
                                 modifier = Modifier.padding(innerPadding)
                             )
