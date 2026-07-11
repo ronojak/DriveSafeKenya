@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                     PolicePresenceProximityDetector.findNearest(lat, lng, policeAlerts)
                 }
 
-                // Periodically fetch police alerts while driving: every 2 min or every 1 km
+                // Periodically fetch police alerts while driving: every 45s or every 1 km
                 LaunchedEffect(userLocation, isDriving) {
                     if (!isDriving || userLocation == null) return@LaunchedEffect
                     val (lat, lng) = userLocation!!
@@ -148,8 +148,8 @@ class MainActivity : ComponentActivity() {
                         sqrt((lat - pLat) * (lat - pLat) + (lng - pLng) * (lng - pLng)) * 111_000.0
                     } ?: Double.MAX_VALUE
 
-                    if (elapsedMs >= 120_000L || distanceMoved >= 1_000.0) {
-                        policePresenceRepository.fetchActiveAlerts(lat, lng)
+                    if (elapsedMs >= POLICE_POLL_INTERVAL_MS || distanceMoved >= POLICE_POLL_DISTANCE_METERS) {
+                        policePresenceRepository.fetchActiveAlerts(lat, lng, POLICE_FETCH_RADIUS_METERS)
                         lastPoliceFetchLocation = Pair(lat, lng)
                         lastPoliceFetchTime = now
                     }
@@ -435,5 +435,11 @@ class MainActivity : ComponentActivity() {
         ) ?: "unknown"
         val bytes = MessageDigest.getInstance("SHA-256").digest(androidId.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        private const val POLICE_POLL_INTERVAL_MS = 45_000L
+        private const val POLICE_POLL_DISTANCE_METERS = 1_000.0
+        private const val POLICE_FETCH_RADIUS_METERS = 12_000
     }
 }
