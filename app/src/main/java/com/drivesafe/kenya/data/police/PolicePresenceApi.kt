@@ -13,19 +13,19 @@ import retrofit2.http.Query
 
 interface PolicePresenceApi {
 
-    @POST("police-presence/report")
+    @POST("api/police-presence/report")
     suspend fun report(
         @Body body: ReportPolicePresenceRequest
     ): Response<PolicePresenceAlertDto>
 
-    @GET("police-presence/active")
+    @GET("api/police-presence/active")
     suspend fun getActive(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
         @Query("radius_meters") radiusMeters: Int = 10_000
     ): Response<ActiveAlertsDto>
 
-    @POST("police-presence/{alertId}/confirm")
+    @POST("api/police-presence/{alertId}/confirm")
     suspend fun confirm(
         @Path("alertId") alertId: String,
         @Body body: ConfirmPresenceRequest
